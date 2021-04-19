@@ -13,8 +13,8 @@ local friction = 0
 floatPart.CustomPhysicalProperties = PhysicalProperties.new(0.7, friction, 0.5, 1, 1)
 floatPart.Parent = workspace
 
-local test = {
-	Gravity = 9.81,
+local storm = {
+	Gravity = 20,
 	MaxDistance = 500,
 	Wave1 = {
 		WaveLength = 150,
@@ -32,7 +32,27 @@ local test = {
 		Direction = Vector2.new(1, 0),
 	},
 }
-local wave = Wave.new(plane, test)
+local calm = {
+	Gravity = 6,
+	MaxDistance = 500,
+	Wave1 = {
+		WaveLength = 75,
+		Steepness = 0.15,
+		Direction = Vector2.new(1, 0),
+	},
+	Wave2 = {
+		WaveLength = 100,
+		Steepness = 0.3,
+		Direction = Vector2.new(0, 0.75),
+	},
+	Wave3 = {
+		WaveLength = 75,
+		Steepness = 0.25,
+		Direction = Vector2.new(0.25, -0.3),
+	},
+}
+
+local wave = Wave.new(plane, storm)
 wave:ConnectRenderStepped()
 wave:AddFloatingPart(floatPart)
 --local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()

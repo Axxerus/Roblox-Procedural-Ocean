@@ -54,16 +54,31 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 
 	if waveCount >= 1 then
 		-- Setup (flat) sea models around animated sea
-		-- local folder = Instance.new("Folder")
-		-- folder.Name = "SeaParts"
-		-- folder.Parent = workspace
-		-- for i = 1, 8  do
-		-- 	local sea = instance:FindFirstChildWhichIsA("MeshPart")
-		-- 	if sea then
-		-- 		sea = sea:Clone()
-
-		-- 	end
-		-- end
+		local folder = Instance.new("Folder")
+		folder.Name = "SeaParts"
+		folder.Parent = workspace
+		local p = instance.Position
+		local s = instance.Size
+		local positions = {
+			-- Main Row (2)
+			p + Vector3.new(-s.X, 0, 0),
+			p + Vector3.new(s.X, 0, 0),
+			-- Top Row (3)
+			p + Vector3.new(-s.X, 0, s.Z),
+			p + Vector3.new(0, 0, s.Z),
+			p + Vector3.new(s.X, 0, s.Z),
+			-- Bottom Row (3)
+			p + Vector3.new(-s.X, 0, -s.Z),
+			p + Vector3.new(0, 0, -s.Z),
+			p + Vector3.new(s.X, 0, -s.Z),
+		}
+		for _, pos in pairs(positions) do
+			if instance then
+				instance = instance:Clone()
+				instance.Position = pos
+				instance.Parent = folder
+			end
+		end
 
 		-- Return "Wave" object
 		return setmetatable({
@@ -212,7 +227,7 @@ function Wave:AddFloatingPart(part, posDrag)
 				destForce = buoyancyForce - dragForce
 			else
 				-- Object is above water, don't apply buoyancy
-				destForce = Vector3.new(0,0,0)
+				destForce = Vector3.new(0, 0, 0)
 			end
 			-- Force of gravity on this attachment
 			destForce -= Vector3.new(0, f, 0)
@@ -224,8 +239,7 @@ function Wave:AddFloatingPart(part, posDrag)
 			+ self:GerstnerWave(Vector2.new(part.Position.X, part.Position.Z)).Y
 		if part.Position.Y - waveHeight > part.Size.Y then
 			-- Part is out of water
-			--waterDragTorque.Enabled = false
-			waterDragTorque.AngularVelocity = Vector3.new(0, 0, 0)
+			waterDragTorque.MaxTorque = Vector3.new(0, 0, 0)
 		else
 			-- part is inside of water
 			local p = part.AssemblyAngularVelocity
