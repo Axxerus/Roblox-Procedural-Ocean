@@ -35,4 +35,6 @@ local test = {
 local wave = Wave.new(plane, test)
 wave:ConnectRenderStepped()
 wave:AddFloatingPart(floatPart)
---wave:AddPlayerFloat(LocalPlayer)
+--local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
+--wave:AddFloatingPart(char:WaitForChild("HumanoidRootPart"))
+wave:AddPlayerFloat(LocalPlayer)
