@@ -1,5 +1,4 @@
 local RunService = game:GetService("RunService")
-local TweenService = game:GetService("TweenService")
 local Players = game:GetService("Players")
 
 local LocalPlayer = Players.LocalPlayer
@@ -75,6 +74,12 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		for _, pos in pairs(positions) do
 			if instance then
 				instance = instance:Clone()
+				-- Cleanup clone
+				for _, v in pairs(instance:GetDescendants()) do
+					if v:IsA("Bone") then
+						v:Destroy()
+					end
+				end
 				instance.Position = pos
 				instance.Parent = folder
 			end
@@ -111,12 +116,12 @@ function Wave:GerstnerWave(xzPos)
 		local dir = cached["UnitDirection"]
 		local amplitude = cached["Amplitude"]
 
-		local displacement = k * (dir:Dot(xzPos) - speed * os.clock())
+		local displacement = (k * dir:Dot(xzPos)) + (speed * os.clock())
 
 		-- Calculate displacement on every axis (xyz)
-		local xPos = dir.X * (amplitude * math.cos(displacement))
+		local xPos = dir.X * amplitude * math.cos(displacement)
 		local yPos = amplitude * math.sin(displacement) -- Y-Position is not affected by direction of wave
-		local zPos = dir.Y * (amplitude * math.cos(displacement))
+		local zPos = dir.Y * amplitude * math.cos(displacement)
 
 		finalDisplacement += Vector3.new(xPos, yPos, zPos) -- Add this wave to final displacement
 	end
@@ -135,7 +140,7 @@ function Wave:UpdateCachedVars()
 
 		-- Variables that don't change on tick
 		local k = (2 * math.pi) / waveLength
-		local speed = math.sqrt(gravity / k)
+		local speed = math.sqrt(gravity * (2 * math.pi / waveLength))
 		local dir = direction.Unit
 		local amplitude = steepness / k
 
@@ -247,7 +252,7 @@ function Wave:AddFloatingPart(part, posDrag)
 			waterDragTorque.MaxTorque = Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
 				* part.AssemblyMass
 				* workspace.Gravity
-				* 24
+				* 20
 		end
 	end)
 end
@@ -323,7 +328,7 @@ end
 function Wave:ConnectRenderStepped()
 	local connection = RunService.RenderStepped:Connect(function()
 		-- Update every bone's transformation
-		debug.profilebegin("Update all bones of ocean")
+		local time = os.clock()
 		for _, bone in pairs(self._bones) do
 			-- Check if bone is close enough to character
 			local worldPos = bone.WorldPosition
@@ -333,28 +338,12 @@ function Wave:ConnectRenderStepped()
 			end
 			local rootPart = char:FindFirstChild("HumanoidRootPart")
 			if rootPart and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance then
-				-- Check if PushPoint --> calculate position
-				local PushPoint = self._generalSettings.PushPoint
-				if PushPoint then
-					local PartPos = nil
-
-					if PushPoint:IsA("Attachment") then
-						PartPos = PushPoint.WorldPosition
-					elseif PushPoint:IsA("BasePart") then
-						PartPos = PushPoint.Position
-					else
-						error("Invalid class for FollowPart, must be a BasePart or an Attachment")
-						return
-					end
-
-					self._generalSettings.Direction = (PartPos - worldPos).Unit
-					self._generalSettings.Direction =
-						Vector2.new(self._generalSettings.Direction.X, self._generalSettings.Direction.Z)
-				end
-				-- If not PushPoint, then Direction is given inside of Settings (Vector2)
-
+				-- Check if bone is visible (from camera's viewpoint)
+				--local _, visible = workspace.CurrentCamera:WorldToViewportPoint(worldPos)
+				--if visible then
 				-- Transform bone
 				bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
+				--end
 			else
 				-- Clear transformation
 				if bone.Transform ~= CFrame.new() then
@@ -362,7 +351,7 @@ function Wave:ConnectRenderStepped()
 				end
 			end
 		end
-		debug.profileend()
+		print(os.clock() - time)
 	end)
 	table.insert(self._connections, connection)
 

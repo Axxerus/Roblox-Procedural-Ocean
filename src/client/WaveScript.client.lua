@@ -14,7 +14,7 @@ floatPart.CustomPhysicalProperties = PhysicalProperties.new(0.7, friction, 0.5, 
 floatPart.Parent = workspace
 
 local storm = {
-	Gravity = 20,
+	Gravity = 9.81,
 	MaxDistance = 500,
 	Wave1 = {
 		WaveLength = 150,
@@ -33,7 +33,7 @@ local storm = {
 	},
 }
 local calm = {
-	Gravity = 6,
+	Gravity = 7,
 	MaxDistance = 500,
 	Wave1 = {
 		WaveLength = 75,
@@ -52,7 +52,7 @@ local calm = {
 	},
 }
 
-local wave = Wave.new(plane, storm)
+local wave = Wave.new(plane, calm)
 wave:ConnectRenderStepped()
 wave:AddFloatingPart(floatPart)
 --local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
