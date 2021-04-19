@@ -52,9 +52,12 @@ local calm = {
 	},
 }
 
-local wave = Wave.new(plane, calm)
+local boatClone = game:GetService("ReplicatedStorage"):WaitForChild("Cutter"):Clone()
+boatClone.Parent = workspace
+
+local wave = Wave.new(plane, storm)
 wave:ConnectRenderStepped()
+
 wave:AddFloatingPart(floatPart)
---local char = LocalPlayer.Character or LocalPlayer.CharacterAdded:Wait()
---wave:AddFloatingPart(char:WaitForChild("HumanoidRootPart"))
+wave:AddFloatingPart(boatClone:WaitForChild("Ballast"))
 wave:AddPlayerFloat(LocalPlayer)

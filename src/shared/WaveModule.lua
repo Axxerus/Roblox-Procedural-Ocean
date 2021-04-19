@@ -156,7 +156,7 @@ end
 -- Make a part float on the waves
 function Wave:AddFloatingPart(part, posDrag)
 	local numberOfAttachments = 4
-	local positionDrag = posDrag or 0.9
+	local positionDrag = posDrag or 0.45
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -209,10 +209,18 @@ function Wave:AddFloatingPart(part, posDrag)
 	cancelGravity.Parent = part
 
 	local gravity = workspace.Gravity / numberOfAttachments -- Force of gravity per attachment
+	-- Get axis of size that is the largest
+	local largestSize = part.Size.X
+	if part.Size.Y > largestSize then
+		largestSize = part.Size.Y
+	end
+	if part.Size.Z > largestSize then
+		largestSize = part.Size.Z
+	end
 
 	RunService.Stepped:Connect(function()
-		local depthBeforeSubmerged = 25
-		local displacementAmount = 0.8
+		local depthBeforeSubmerged = 50
+		local displacementAmount = 0.9
 
 		-- Force per attachment
 		for attachment, force in pairs(attachments) do
@@ -242,18 +250,36 @@ function Wave:AddFloatingPart(part, posDrag)
 		-- Angular drag
 		local waveHeight = self._instance.Position.Y
 			+ self:GerstnerWave(Vector2.new(part.Position.X, part.Position.Z)).Y
-		if part.Position.Y - waveHeight > part.Size.Y then
-			-- Part is out of water
-			waterDragTorque.MaxTorque = Vector3.new(0, 0, 0)
+		local difference = part.Position.Y - waveHeight
+
+		-- part is inside of water
+		local p = part.AssemblyAngularVelocity
+		--[[ 
+			Torque is Directly proportional to: 
+			 	current angular velocity, 
+			 	part's largest side (larger means more torque can be generated), 
+			 	the part's AssemblyMass * gravity
+			And is inversely proportional to:
+				The difference between waveHeight and part height (Smoothly go towards zero the farther part is out of water)
+			--]]
+		if difference < 0 then
+			-- Part is under water, don't smoothly remove rotational drag
+			difference = 1
 		else
-			-- part is inside of water
-			local p = part.AssemblyAngularVelocity
-			waterDragTorque.AngularVelocity = Vector3.new(0, 0, 0) --p * angularDrag
-			waterDragTorque.MaxTorque = Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
-				* part.AssemblyMass
-				* workspace.Gravity
-				* 20
+			-- Part is out of water! remove rotational drag the further it goes from the water
+			difference *= 100
 		end
+		waterDragTorque.MaxTorque = Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
+			* largestSize
+			* part.AssemblyMass
+			* workspace.Gravity
+			/ (difference * 100)
+		-- waterDragTorque.MaxTorque = (Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z)) + part.Size)
+		-- 	* part.AssemblyMass
+		-- 	* 5
+
+		-- Parts might have been added to the assembly, so update the cancelGravity force
+		cancelGravity.Force = Vector3.new(0, workspace.Gravity * part.AssemblyMass, 0)
 	end)
 end
 
@@ -328,7 +354,7 @@ end
 function Wave:ConnectRenderStepped()
 	local connection = RunService.RenderStepped:Connect(function()
 		-- Update every bone's transformation
-		local time = os.clock()
+		--local time = os.clock()
 		for _, bone in pairs(self._bones) do
 			-- Check if bone is close enough to character
 			local worldPos = bone.WorldPosition
@@ -351,7 +377,7 @@ function Wave:ConnectRenderStepped()
 				end
 			end
 		end
-		print(os.clock() - time)
+		--print(os.clock() - time)
 	end)
 	table.insert(self._connections, connection)
 
