@@ -250,7 +250,7 @@ function Wave:AddFloatingPart(part, posDrag)
 		-- Angular drag
 		local waveHeight = self._instance.Position.Y
 			+ self:GerstnerWave(Vector2.new(part.Position.X, part.Position.Z)).Y
-		local difference = part.Position.Y - waveHeight
+		local difference = (part.Position.Y - part.Size.Y / 2) - waveHeight
 
 		-- part is inside of water
 		local p = part.AssemblyAngularVelocity
@@ -261,22 +261,21 @@ function Wave:AddFloatingPart(part, posDrag)
 			 	the part's AssemblyMass * gravity
 			And is inversely proportional to:
 				The difference between waveHeight and part height (Smoothly go towards zero the farther part is out of water)
-			--]]
+		--]]
 		if difference < 0 then
 			-- Part is under water, don't smoothly remove rotational drag
 			difference = 1
 		else
-			-- Part is out of water! remove rotational drag the further it goes from the water
-			difference *= 100
+			-- (middle of) part is out of water! remove rotational drag the further it goes from the water
+			difference = (difference ^ 2) / 4
 		end
 		waterDragTorque.MaxTorque = Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
 			* largestSize
 			* part.AssemblyMass
 			* workspace.Gravity
-			/ (difference * 100)
-		-- waterDragTorque.MaxTorque = (Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z)) + part.Size)
-		-- 	* part.AssemblyMass
-		-- 	* 5
+			/ difference
+
+		print(difference)
 
 		-- Parts might have been added to the assembly, so update the cancelGravity force
 		cancelGravity.Force = Vector3.new(0, workspace.Gravity * part.AssemblyMass, 0)

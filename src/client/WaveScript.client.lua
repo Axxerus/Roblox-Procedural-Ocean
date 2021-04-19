@@ -36,28 +36,43 @@ local calm = {
 	Gravity = 7,
 	MaxDistance = 500,
 	Wave1 = {
-		WaveLength = 75,
+		WaveLength = 100,
 		Steepness = 0.15,
 		Direction = Vector2.new(1, 0),
 	},
 	Wave2 = {
-		WaveLength = 100,
-		Steepness = 0.3,
+		WaveLength = 200,
+		Steepness = 0.25,
 		Direction = Vector2.new(0, 0.75),
 	},
 	Wave3 = {
-		WaveLength = 75,
+		WaveLength = 50,
 		Steepness = 0.25,
 		Direction = Vector2.new(0.25, -0.3),
+	},
+}
+
+local tsunami = {
+	Gravity = 9.81,
+	MaxDistance = 500,
+	Wave = {
+		WaveLength = 500,
+		Steepness = 0.6,
+		Direction = Vector2.new(1, 0),
+	},
+	Wave2 = {
+		WaveLength = 150,
+		Steepness = 0.35,
+		Direction = Vector2.new(1, -0.75),
 	},
 }
 
 local boatClone = game:GetService("ReplicatedStorage"):WaitForChild("Cutter"):Clone()
 boatClone.Parent = workspace
 
-local wave = Wave.new(plane, storm)
+local wave = Wave.new(plane, tsunami)
 wave:ConnectRenderStepped()
 
-wave:AddFloatingPart(floatPart)
+--wave:AddFloatingPart(floatPart)
 wave:AddFloatingPart(boatClone:WaitForChild("Ballast"))
-wave:AddPlayerFloat(LocalPlayer)
+--wave:AddPlayerFloat(LocalPlayer)
