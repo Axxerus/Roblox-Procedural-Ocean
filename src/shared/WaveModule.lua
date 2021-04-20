@@ -137,6 +137,15 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 	return finalDisplacement
 end
 
+-- Get the height of a point at a certain xz-position
+function Wave:GetHeight(xzPos, timeOffset)
+	local w = self:GerstnerWave(xzPos, timeOffset)
+	local correctedXZPos = Vector2.new(xzPos.X + w.X, xzPos.Y + w.Z)
+
+	local heightOffset = self:GerstnerWave(correctedXZPos, timeOffset).Y
+	return heightOffset
+end
+
 -- Update cached variables used by GerstnerWave function
 function Wave:UpdateCachedVars()
 	self._cachedVars = {}
@@ -235,7 +244,7 @@ function Wave:AddFloatingPart(part, posDrag)
 		for attachment, force in pairs(attachments) do
 			local worldPos = attachment.WorldPosition
 			-- Calculate wave height at the attachment's position
-			local waveHeight = self._instance.Position.Y + self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)).Y
+			local waveHeight = self._instance.Position.Y + self:GetHeight(Vector2.new(worldPos.X, worldPos.Z))
 			local displacementMultiplier =
 				math.clamp((waveHeight - worldPos.Y) / depthBeforeSubmerged * displacementAmount, 0, 1)
 
@@ -257,8 +266,7 @@ function Wave:AddFloatingPart(part, posDrag)
 		end
 
 		-- Angular drag
-		local waveHeight = self._instance.Position.Y
-			+ self:GerstnerWave(Vector2.new(part.Position.X, part.Position.Z)).Y
+		local waveHeight = self._instance.Position.Y + self:GetHeight(Vector2.new(part.Position.X, part.Position.Z))
 		local difference = (part.Position.Y - part.Size.Y / 2) - waveHeight
 
 		-- part is inside of water
@@ -400,14 +408,7 @@ function Wave:ConnectRenderStepped()
 					-- Transform bone
 					local timeOffset = dt * frameDivisionCount
 					local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
-					-- TweenService
-					-- 	:Create(
-					-- 		bone,
-					-- 		TweenInfo.new(timeOffset),
-					-- 		{ Transform = CFrame.new(transform) }
-					-- 	)
-					-- 	:Play()
-					--bone.Transform = CFrame.new(transform)
+					-- Smoothly interpolate bone to position
 					Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
 				else
 					-- Clear transformation

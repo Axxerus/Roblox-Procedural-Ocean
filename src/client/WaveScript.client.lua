@@ -27,7 +27,7 @@ local calm = {
 		Direction = Vector2.new(0, 0.75),
 	},
 	Wave3 = {
-		WaveLength = 50,
+		WaveLength = 125,
 		Steepness = 0.25,
 		Direction = Vector2.new(0.25, -0.3),
 	},
@@ -69,7 +69,7 @@ local tsunami = {
 local boatClone = game:GetService("ReplicatedStorage"):WaitForChild("Cutter"):Clone()
 boatClone.Parent = workspace
 
-local wave = Wave.new(plane, storm)
+local wave = Wave.new(plane, calm)
 wave:ConnectRenderStepped()
 
 wave:AddFloatingPart(floatPart)
