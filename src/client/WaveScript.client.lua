@@ -12,9 +12,6 @@ floatPart.Color = Color3.fromRGB(65, 36, 17)
 local friction = 0
 floatPart.CustomPhysicalProperties = PhysicalProperties.new(0.7, friction, 0.5, 1, 1)
 floatPart.Parent = workspace
-for _, v in pairs({1,2,3}) do
-	break
-end
 
 local calm = {
 	Gravity = 7,
@@ -75,6 +72,6 @@ boatClone.Parent = workspace
 local wave = Wave.new(plane, storm)
 wave:ConnectRenderStepped()
 
---wave:AddFloatingPart(floatPart)
+wave:AddFloatingPart(floatPart)
 wave:AddFloatingPart(boatClone:WaitForChild("Ballast"))
---wave:AddPlayerFloat(LocalPlayer)
+wave:AddPlayerFloat(LocalPlayer)

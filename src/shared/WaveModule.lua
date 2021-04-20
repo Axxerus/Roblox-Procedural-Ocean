@@ -2,6 +2,8 @@ local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 local TweenService = game:GetService("TweenService")
 
+local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
+
 local LocalPlayer = Players.LocalPlayer
 -- Default wave settings
 local default = {
@@ -356,32 +358,36 @@ end
 
 -- Update wave on RenderStepped
 function Wave:ConnectRenderStepped()
-	local frameDivisionCount = 5 -- Amount of frames to divide work over
+	local frameDivisionCount = 25 -- Amount of frames to divide work over
 
-	-- Utility function to copy a table (shallow)
-	local function shallowCopy(original)
-		local copy = {}
-		for key, value in pairs(original) do
-			copy[key] = value
+	-- Generate tables containing small(er) batches of bones
+	local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
+	local batches = {}
+
+	local batchCounter = 1
+	local boneCounter = 0
+	for _, bone in pairs(self._bones) do
+		if not batches[batchCounter] then
+			batches[batchCounter] = {}
 		end
-		return copy
+		table.insert(batches[batchCounter], bone)
+		boneCounter += 1
+		if boneCounter >= updateBonesAmount then
+			-- Setup new batch
+			boneCounter = 0
+			batchCounter += 1
+		end
 	end
 
-	-- Table that is used to update bones in batches
-	self._bonesTableClone = shallowCopy(self._bones)
-
+	local currentBatch = 1
 	local connection = RunService.RenderStepped:Connect(function(dt)
 		local time = os.clock()
 
-		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
-
-		if #self._bonesTableClone <= 0 then
-			-- Reset table
-			self._bonesTableClone = shallowCopy(self._bones)
+		if currentBatch > #batches then
+			-- Reset currentBatch to 1
+			currentBatch = 1
 		end
-		local counter = 0
-		local keepers = {}
-		for _, bone in pairs(self._bonesTableClone) do
+		for _, bone in pairs(batches[currentBatch]) do
 			-- Check if bone is close enough to character
 			local worldPos = bone.WorldPosition
 			local char = LocalPlayer.Character
@@ -392,13 +398,17 @@ function Wave:ConnectRenderStepped()
 					and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance
 				then
 					-- Transform bone
-					-- local offset = dt * frameDivisionCount
+					local timeOffset = dt * frameDivisionCount
+					local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
 					-- TweenService
-					-- 	:Create(bone, TweenInfo.new(offset), {
-					-- 		Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), offset)),
-					-- 	})
+					-- 	:Create(
+					-- 		bone,
+					-- 		TweenInfo.new(timeOffset),
+					-- 		{ Transform = CFrame.new(transform) }
+					-- 	)
 					-- 	:Play()
-					bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
+					--bone.Transform = CFrame.new(transform)
+					Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
 				else
 					-- Clear transformation
 					if bone.Transform ~= CFrame.new() then
@@ -406,19 +416,11 @@ function Wave:ConnectRenderStepped()
 					end
 				end
 			end
-
-			counter += 1
-			if counter > updateBonesAmount then
-				-- Copy rest of array to a placeholder. These bones will be computed next frame(s)
-				table.insert(keepers, bone)
-			end
 		end
-
-		-- Change "_bonesTableClone" to the bones that were not updated this frame.
-		self._bonesTableClone = shallowCopy(keepers)
-
+		currentBatch += 1
 		print(os.clock() - time)
 	end)
+
 	table.insert(self._connections, connection)
 
 	return connection
