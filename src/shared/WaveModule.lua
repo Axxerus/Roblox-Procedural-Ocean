@@ -356,7 +356,7 @@ end
 
 -- Update wave on RenderStepped
 function Wave:ConnectRenderStepped()
-	local frameDivisionCount = 10 -- Amount of frames to divide work over
+	local frameDivisionCount = 5 -- Amount of frames to divide work over
 
 	-- Utility function to copy a table (shallow)
 	local function shallowCopy(original)
@@ -418,25 +418,6 @@ function Wave:ConnectRenderStepped()
 		self._bonesTableClone = shallowCopy(keepers)
 
 		print(os.clock() - time)
-
-		-- for _, bone in pairs(self._bones) do
-		-- 	-- Check if bone is close enough to character
-		-- 	local worldPos = bone.WorldPosition
-		-- 	local char = LocalPlayer.Character
-		-- 	if not char then
-		-- 		return
-		-- 	end
-		-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
-		-- 	if rootPart and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance then
-		-- 		-- Transform bone
-		-- 		bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
-		-- 	else
-		-- 		-- Clear transformation
-		-- 		if bone.Transform ~= CFrame.new() then
-		-- 			bone.Transform = CFrame.new()
-		-- 		end
-		-- 	end
-		-- end
 	end)
 	table.insert(self._connections, connection)
 
