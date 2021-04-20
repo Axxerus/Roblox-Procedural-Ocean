@@ -1,5 +1,6 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
+local TweenService = game:GetService("TweenService")
 
 local LocalPlayer = Players.LocalPlayer
 -- Default wave settings
@@ -100,7 +101,7 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 end
 
 -- Calculate final displacement sum of all Gerstner waves
-function Wave:GerstnerWave(xzPos)
+function Wave:GerstnerWave(xzPos, timeOffset)
 	local finalDisplacement = Vector3.new()
 	-- Calculate bone displacement for every wave
 	for waveName, _ in pairs(self._waveSettings) do
@@ -116,7 +117,13 @@ function Wave:GerstnerWave(xzPos)
 		local dir = cached["UnitDirection"]
 		local amplitude = cached["Amplitude"]
 
-		local displacement = (k * dir:Dot(xzPos)) + (speed * os.clock())
+		-- Calculate displacement whilst taking into account the time offset
+		local displacement
+		if not timeOffset then
+			displacement = (k * dir:Dot(xzPos)) + (speed * os.clock())
+		else
+			displacement = (k * dir:Dot(xzPos)) + (speed * (os.clock() + timeOffset))
+		end
 
 		-- Calculate displacement on every axis (xyz)
 		local xPos = dir.X * amplitude * math.cos(displacement)
@@ -275,8 +282,6 @@ function Wave:AddFloatingPart(part, posDrag)
 			* workspace.Gravity
 			/ difference
 
-		print(difference)
-
 		-- Parts might have been added to the assembly, so update the cancelGravity force
 		cancelGravity.Force = Vector3.new(0, workspace.Gravity * part.AssemblyMass, 0)
 	end)
@@ -351,32 +356,87 @@ end
 
 -- Update wave on RenderStepped
 function Wave:ConnectRenderStepped()
-	local connection = RunService.RenderStepped:Connect(function()
-		-- Update every bone's transformation
-		--local time = os.clock()
-		for _, bone in pairs(self._bones) do
+	local frameDivisionCount = 10 -- Amount of frames to divide work over
+
+	-- Utility function to copy a table (shallow)
+	local function shallowCopy(original)
+		local copy = {}
+		for key, value in pairs(original) do
+			copy[key] = value
+		end
+		return copy
+	end
+
+	-- Table that is used to update bones in batches
+	self._bonesTableClone = shallowCopy(self._bones)
+
+	local connection = RunService.RenderStepped:Connect(function(dt)
+		local time = os.clock()
+
+		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
+
+		if #self._bonesTableClone <= 0 then
+			-- Reset table
+			self._bonesTableClone = shallowCopy(self._bones)
+		end
+		local counter = 0
+		local keepers = {}
+		for _, bone in pairs(self._bonesTableClone) do
 			-- Check if bone is close enough to character
 			local worldPos = bone.WorldPosition
 			local char = LocalPlayer.Character
-			if not char then
-				return
-			end
-			local rootPart = char:FindFirstChild("HumanoidRootPart")
-			if rootPart and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance then
-				-- Check if bone is visible (from camera's viewpoint)
-				--local _, visible = workspace.CurrentCamera:WorldToViewportPoint(worldPos)
-				--if visible then
-				-- Transform bone
-				bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
-				--end
-			else
-				-- Clear transformation
-				if bone.Transform ~= CFrame.new() then
-					bone.Transform = CFrame.new()
+			if char then
+				local rootPart = char:FindFirstChild("HumanoidRootPart")
+				if
+					rootPart
+					and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance
+				then
+					-- Transform bone
+					-- local offset = dt * frameDivisionCount
+					-- TweenService
+					-- 	:Create(bone, TweenInfo.new(offset), {
+					-- 		Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), offset)),
+					-- 	})
+					-- 	:Play()
+					bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
+				else
+					-- Clear transformation
+					if bone.Transform ~= CFrame.new() then
+						bone.Transform = CFrame.new()
+					end
 				end
 			end
+
+			counter += 1
+			if counter > updateBonesAmount then
+				-- Copy rest of array to a placeholder. These bones will be computed next frame(s)
+				table.insert(keepers, bone)
+			end
 		end
-		--print(os.clock() - time)
+
+		-- Change "_bonesTableClone" to the bones that were not updated this frame.
+		self._bonesTableClone = shallowCopy(keepers)
+
+		print(os.clock() - time)
+
+		-- for _, bone in pairs(self._bones) do
+		-- 	-- Check if bone is close enough to character
+		-- 	local worldPos = bone.WorldPosition
+		-- 	local char = LocalPlayer.Character
+		-- 	if not char then
+		-- 		return
+		-- 	end
+		-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
+		-- 	if rootPart and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance then
+		-- 		-- Transform bone
+		-- 		bone.Transform = CFrame.new(self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z)))
+		-- 	else
+		-- 		-- Clear transformation
+		-- 		if bone.Transform ~= CFrame.new() then
+		-- 			bone.Transform = CFrame.new()
+		-- 		end
+		-- 	end
+		-- end
 	end)
 	table.insert(self._connections, connection)
 
