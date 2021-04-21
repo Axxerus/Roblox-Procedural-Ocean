@@ -5,6 +5,9 @@
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
+local requestSettings = script.Parent:WaitForChild("RequestSettings")
+local settingsChanged = script.Parent:WaitForChild("SettingsChanged")
+
 local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
 
 local LocalPlayer = Players.LocalPlayer
@@ -21,7 +24,7 @@ local default = {
 local Wave = {}
 Wave.__index = Wave
 
--- Create a new Wave
+-- Create a new Wave object
 function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 	-- Check types
 	if typeof(instance) ~= "Instance" then
@@ -42,66 +45,97 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		error("No bones have been found inside the chosen model!")
 	end
 
-	-- Check if valid settings and sort general settings from settings per wave
-	local waveSettings = {}
-	local waveCount = 0
-	local generalSettings = {}
-	for i, v in pairs(settings) do
-		if typeof(v) == "table" then
-			-- Insert in wave settings table
-			waveSettings[i] = v
-			waveCount += 1
-		else
-			-- Insert in general settings table
-			generalSettings[i] = v
-		end
-	end
-
-	if waveCount >= 1 then
-		-- Setup (flat) sea models around animated sea
-		local folder = Instance.new("Folder")
-		folder.Name = "SeaParts"
-		folder.Parent = workspace
-		local p = instance.Position
-		local s = instance.Size
-		local positions = {
-			-- Main Row (2)
-			p + Vector3.new(-s.X, 0, 0),
-			p + Vector3.new(s.X, 0, 0),
-			-- Top Row (3)
-			p + Vector3.new(-s.X, 0, s.Z),
-			p + Vector3.new(0, 0, s.Z),
-			p + Vector3.new(s.X, 0, s.Z),
-			-- Bottom Row (3)
-			p + Vector3.new(-s.X, 0, -s.Z),
-			p + Vector3.new(0, 0, -s.Z),
-			p + Vector3.new(s.X, 0, -s.Z),
-		}
-		for _, pos in pairs(positions) do
-			if instance then
-				instance = instance:Clone()
-				-- Cleanup clone
-				for _, v in pairs(instance:GetDescendants()) do
-					if v:IsA("Bone") then
-						v:Destroy()
-					end
-				end
-				instance.Position = pos
-				instance.Parent = folder
-			end
-		end
-
-		-- Return "Wave" object
+	-- Return metatable / "Wave" object
+	local function createMeta(generalSettings, waveSettings)
 		return setmetatable({
 			_instance = instance,
 			_bones = bones,
 			_connections = {},
 			_cachedVars = {},
-			_generalSettings = generalSettings,
-			_waveSettings = waveSettings,
+			generalSettings = generalSettings,
+			waveSettings = waveSettings,
 		}, Wave)
+	end
+
+	if settings.ListenToServer then
+		-- Listen to SERVER for getting settings
+		-- Don't create settings locally
+		if RunService:IsClient() then
+			-- Request settings from server (RemoteFunction)
+			local generalSettings, waveSettings = requestSettings:InvokeServer()
+			local meta
+			if generalSettings and waveSettings then
+				meta = createMeta(generalSettings, waveSettings)
+			end
+
+			-- Listen to server settings change (RemoteEvent)
+			settingsChanged.OnClientEvent:Connect(function(newGeneralSettings, newWaveSettings)
+				if meta then
+					meta.generalSettings = newGeneralSettings
+					meta.waveSettings = newWaveSettings
+				end
+			end)
+		else
+			error("Trying to get server settings from a serverscript!")
+		end
 	else
-		error("No Wave settings found! Make sure to follow the right format.")
+		-- Get settings from settings table
+		-- Effect will be LOCAL!
+
+		-- Check if valid settings and sort general settings from settings per wave
+		local waveSettings = {}
+		local waveCount = 0
+		local generalSettings = {}
+		for i, v in pairs(settings) do
+			if typeof(v) == "table" then
+				-- Insert in wave settings table
+				waveSettings[i] = v
+				waveCount += 1
+			else
+				-- Insert in general settings table
+				generalSettings[i] = v
+			end
+		end
+
+		if waveCount >= 1 then
+			-- Setup (flat) sea models around animated sea
+			local folder = Instance.new("Folder")
+			folder.Name = "SeaParts"
+			folder.Parent = workspace
+			local p = instance.Position
+			local s = instance.Size
+			local positions = {
+				-- Main Row (2)
+				p + Vector3.new(-s.X, 0, 0),
+				p + Vector3.new(s.X, 0, 0),
+				-- Top Row (3)
+				p + Vector3.new(-s.X, 0, s.Z),
+				p + Vector3.new(0, 0, s.Z),
+				p + Vector3.new(s.X, 0, s.Z),
+				-- Bottom Row (3)
+				p + Vector3.new(-s.X, 0, -s.Z),
+				p + Vector3.new(0, 0, -s.Z),
+				p + Vector3.new(s.X, 0, -s.Z),
+			}
+			for _, pos in pairs(positions) do
+				if instance then
+					instance = instance:Clone()
+					-- Cleanup clone
+					for _, v in pairs(instance:GetDescendants()) do
+						if v:IsA("Bone") then
+							v:Destroy()
+						end
+					end
+					instance.Position = pos
+					instance.Parent = folder
+				end
+			end
+
+			-- Return "Wave" object
+			return createMeta(generalSettings, waveSettings)
+		else
+			error("No Wave settings found! Make sure to follow the right format.")
+		end
 	end
 end
 
@@ -109,7 +143,7 @@ end
 function Wave:GerstnerWave(xzPos, timeOffset)
 	local finalDisplacement = Vector3.new()
 	-- Calculate bone displacement for every wave
-	for waveName, _ in pairs(self._waveSettings) do
+	for waveName, _ in pairs(self.waveSettings) do
 		-- Calculate cachedVars (if they weren't already calculated)
 		if not self._cachedVars[waveName] then
 			self:UpdateCachedVars()
@@ -152,12 +186,12 @@ end
 -- Update cached variables used by GerstnerWave function
 function Wave:UpdateCachedVars()
 	self._cachedVars = {}
-	for waveName, waveSetting in pairs(self._waveSettings) do
+	for waveName, waveSetting in pairs(self.waveSettings) do
 		-- Get settings: from this wave, from generalSettings or from default
-		local waveLength = waveSetting.WaveLength or self._generalSettings.WaveLength or default.WaveLength
-		local gravity = waveSetting.Gravity or self._generalSettings.Gravity or default.Gravity
-		local direction = waveSetting.Direction or self._generalSettings.Direction or default.Direction
-		local steepness = waveSetting.Steepness or self._generalSettings.Steepness or default.Steepness
+		local waveLength = waveSetting.WaveLength or self.generalSettings.WaveLength or default.WaveLength
+		local gravity = waveSetting.Gravity or self.generalSettings.Gravity or default.Gravity
+		local direction = waveSetting.Direction or self.generalSettings.Direction or default.Direction
+		local steepness = waveSetting.Steepness or self.generalSettings.Steepness or default.Steepness
 
 		-- Variables that don't change on tick
 		local k = (2 * math.pi) / waveLength
@@ -367,66 +401,70 @@ function Wave:AddPlayerFloat(player)
 	-- table.insert(self._connections, connection)
 end
 
--- Update wave on RenderStepped
-function Wave:ConnectRenderStepped()
-	local frameDivisionCount = 25 -- Amount of frames to divide work over
+-- Update wave's bones on RenderStepped (only done client-side)
+function Wave:ConnectUpdate()
+	if RunService:IsClient() then
+		local frameDivisionCount = 25 -- Amount of frames to divide work over
 
-	-- Generate tables containing small(er) batches of bones
-	local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
-	local batches = {}
+		-- Generate tables containing small(er) batches of bones
+		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
+		local batches = {}
 
-	local batchCounter = 1
-	local boneCounter = 0
-	for _, bone in pairs(self._bones) do
-		if not batches[batchCounter] then
-			batches[batchCounter] = {}
+		local batchCounter = 1
+		local boneCounter = 0
+		for _, bone in pairs(self._bones) do
+			if not batches[batchCounter] then
+				batches[batchCounter] = {}
+			end
+			table.insert(batches[batchCounter], bone)
+			boneCounter += 1
+			if boneCounter >= updateBonesAmount then
+				-- Setup new batch
+				boneCounter = 0
+				batchCounter += 1
+			end
 		end
-		table.insert(batches[batchCounter], bone)
-		boneCounter += 1
-		if boneCounter >= updateBonesAmount then
-			-- Setup new batch
-			boneCounter = 0
-			batchCounter += 1
-		end
-	end
 
-	local currentBatch = 1
-	local connection = RunService.RenderStepped:Connect(function(dt)
-		debug.profilebegin("Update bones of wave")
-		if currentBatch > #batches then
-			-- Reset currentBatch to 1
-			currentBatch = 1
-		end
-		for _, bone in pairs(batches[currentBatch]) do
-			-- Check if bone is close enough to character
-			local worldPos = bone.WorldPosition
-			local char = LocalPlayer.Character
-			if char then
-				local rootPart = char:FindFirstChild("HumanoidRootPart")
-				if
-					rootPart
-					and (rootPart.Position - worldPos).Magnitude <= self._generalSettings.MaxDistance
-				then
-					-- Transform bone
-					local timeOffset = dt * frameDivisionCount
-					local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
-					-- Smoothly interpolate bone to position
-					Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
-				else
-					-- Clear transformation
-					if bone.Transform ~= CFrame.new() then
-						bone.Transform = CFrame.new()
+		local currentBatch = 1
+		local connection = RunService.RenderStepped:Connect(function(dt)
+			debug.profilebegin("Update bones of wave")
+			if currentBatch > #batches then
+				-- Reset currentBatch to 1
+				currentBatch = 1
+			end
+			for _, bone in pairs(batches[currentBatch]) do
+				-- Check if bone is close enough to character
+				local worldPos = bone.WorldPosition
+				local char = LocalPlayer.Character
+				if char then
+					local rootPart = char:FindFirstChild("HumanoidRootPart")
+					if
+						rootPart
+						and (rootPart.Position - worldPos).Magnitude <= self.generalSettings.MaxDistance
+					then
+						-- Transform bone
+						local timeOffset = dt * frameDivisionCount
+						local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+						-- Smoothly interpolate bone to position
+						Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
+					else
+						-- Clear transformation
+						if bone.Transform ~= CFrame.new() then
+							bone.Transform = CFrame.new()
+						end
 					end
 				end
 			end
-		end
-		currentBatch += 1
-		debug.profileend()
-	end)
+			currentBatch += 1
+			debug.profileend()
+		end)
 
-	table.insert(self._connections, connection)
+		table.insert(self._connections, connection)
 
-	return connection
+		return connection
+	else
+		warn("The bones of your wave shouldn't be updated by the server. Call this function from the client(s)!")
+	end
 end
 
 -- Destroy the Wave "object"
@@ -451,7 +489,7 @@ function Wave:Destroy()
 	end
 	-- Cleanup variables
 	self._bones = {}
-	self._generalSettings = {}
+	self.generalSettings = {}
 	self = nil
 end
 

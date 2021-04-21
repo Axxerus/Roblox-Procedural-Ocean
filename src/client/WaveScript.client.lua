@@ -1,7 +1,7 @@
 local Players = game:GetService("Players")
 
 local common = game:GetService("ReplicatedStorage"):WaitForChild("Common")
-local Wave = require(common:WaitForChild("WaveModule"))
+local Wave = require(common:WaitForChild("WaveHandler"):WaitForChild("WaveModule"))
 local WindLines = require(common:WaitForChild("WindLines"))
 
 -- Create WindLines
@@ -88,7 +88,7 @@ local boatClone = game:GetService("ReplicatedStorage"):WaitForChild("Cutter"):Cl
 boatClone.Parent = workspace
 
 local wave = Wave.new(plane, calm)
-wave:ConnectRenderStepped()
+wave:ConnectUpdate(true)
 
 wave:AddFloatingPart(floatPart)
 wave:AddFloatingPart(boatClone:WaitForChild("Ballast"))
