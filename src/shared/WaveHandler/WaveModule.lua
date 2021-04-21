@@ -8,7 +8,11 @@ local Players = game:GetService("Players")
 local requestSettings = script.Parent:WaitForChild("RequestSettings")
 local settingsChanged = script.Parent:WaitForChild("SettingsChanged")
 
+-- Modules
 local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
+local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
+
+SyncedClock:Initialize()
 
 local LocalPlayer = Players.LocalPlayer
 -- Default wave settings
@@ -45,6 +49,61 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		error("No bones have been found inside the chosen model!")
 	end
 
+	-- Setup (flat) sea models around animated sea (create illusion of infinite sea)
+	local function setupFlatModels()
+		local folder = Instance.new("Folder")
+		folder.Name = "SeaParts"
+		folder.Parent = workspace
+		local p = instance.Position
+		local s = instance.Size
+		local positions = {
+			-- Main Row (2)
+			p + Vector3.new(-s.X, 0, 0),
+			p + Vector3.new(s.X, 0, 0),
+			-- Top Row (3)
+			p + Vector3.new(-s.X, 0, s.Z),
+			p + Vector3.new(0, 0, s.Z),
+			p + Vector3.new(s.X, 0, s.Z),
+			-- Bottom Row (3)
+			p + Vector3.new(-s.X, 0, -s.Z),
+			p + Vector3.new(0, 0, -s.Z),
+			p + Vector3.new(s.X, 0, -s.Z),
+		}
+		for _, pos in pairs(positions) do
+			if instance then
+				instance = instance:Clone()
+				-- Cleanup clone
+				for _, v in pairs(instance:GetDescendants()) do
+					if v:IsA("Bone") then
+						v:Destroy()
+					end
+				end
+				instance.Position = pos
+				instance.Parent = folder
+			end
+		end
+	end
+
+	-- Sort settings into two tables:
+	-- * one for general settings (apply to all waves)
+	-- * one for wave settings (specific settings per wave)
+	local function sortSettings()
+		local waveSettings = {}
+		local generalSettings = {}
+		local waveCounter = 0
+		for i, v in pairs(settings) do
+			if typeof(v) == "table" then
+				-- Insert in wave settings table
+				waveSettings[i] = v
+				waveCounter +=1
+			else
+				-- Insert in general settings table
+				generalSettings[i] = v
+			end
+		end
+		return generalSettings, waveSettings, waveCounter
+	end
+
 	-- Return metatable / "Wave" object
 	local function createMeta(generalSettings, waveSettings)
 		return setmetatable({
@@ -57,10 +116,14 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		}, Wave)
 	end
 
-	if settings.ListenToServer then
-		-- Listen to SERVER for getting settings
-		-- Don't create settings locally
-		if RunService:IsClient() then
+	if RunService:IsClient() then
+		-- Setup for client
+		if settings.ListenToServer then
+			-- Listen to SERVER for getting settings
+			-- Don't create settings locally
+
+			setupFlatModels()
+
 			-- Request settings from server (RemoteFunction)
 			local generalSettings, waveSettings = requestSettings:InvokeServer()
 			local meta
@@ -75,64 +138,35 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 					meta.waveSettings = newWaveSettings
 				end
 			end)
+			return meta
 		else
-			error("Trying to get server settings from a serverscript!")
+			-- Get settings from settings table
+			-- Effect will be LOCAL only!
+
+			-- Sort settings
+			local generalSettings, waveSettings, waveCounter= sortSettings()
+
+			if waveCounter >= 1 then
+				setupFlatModels()
+
+				-- Return "Wave" object
+				return createMeta(generalSettings, waveSettings)
+			else
+				error("No Wave settings found! Make sure to follow the right format.")
+			end
 		end
 	else
-		-- Get settings from settings table
-		-- Effect will be LOCAL!
+		-- Setup for server
+		local generalSettings, waveSettings, waveCounter= sortSettings()
+		if waveCounter >= 1 then
+			local meta = createMeta(generalSettings, waveSettings)
 
-		-- Check if valid settings and sort general settings from settings per wave
-		local waveSettings = {}
-		local waveCount = 0
-		local generalSettings = {}
-		for i, v in pairs(settings) do
-			if typeof(v) == "table" then
-				-- Insert in wave settings table
-				waveSettings[i] = v
-				waveCount += 1
-			else
-				-- Insert in general settings table
-				generalSettings[i] = v
-			end
-		end
-
-		if waveCount >= 1 then
-			-- Setup (flat) sea models around animated sea
-			local folder = Instance.new("Folder")
-			folder.Name = "SeaParts"
-			folder.Parent = workspace
-			local p = instance.Position
-			local s = instance.Size
-			local positions = {
-				-- Main Row (2)
-				p + Vector3.new(-s.X, 0, 0),
-				p + Vector3.new(s.X, 0, 0),
-				-- Top Row (3)
-				p + Vector3.new(-s.X, 0, s.Z),
-				p + Vector3.new(0, 0, s.Z),
-				p + Vector3.new(s.X, 0, s.Z),
-				-- Bottom Row (3)
-				p + Vector3.new(-s.X, 0, -s.Z),
-				p + Vector3.new(0, 0, -s.Z),
-				p + Vector3.new(s.X, 0, -s.Z),
-			}
-			for _, pos in pairs(positions) do
-				if instance then
-					instance = instance:Clone()
-					-- Cleanup clone
-					for _, v in pairs(instance:GetDescendants()) do
-						if v:IsA("Bone") then
-							v:Destroy()
-						end
-					end
-					instance.Position = pos
-					instance.Parent = folder
-				end
+			-- Setup RemoteFunction settings request
+			requestSettings.OnServerInvoke = function()
+				return meta.generalSettings, meta.waveSettings
 			end
 
-			-- Return "Wave" object
-			return createMeta(generalSettings, waveSettings)
+			return meta
 		else
 			error("No Wave settings found! Make sure to follow the right format.")
 		end
@@ -159,9 +193,9 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 		-- Calculate displacement whilst taking into account the time offset
 		local displacement
 		if not timeOffset then
-			displacement = (k * dir:Dot(xzPos)) + (speed * os.clock())
+			displacement = (k * dir:Dot(xzPos)) + (speed * SyncedClock:GetTime())
 		else
-			displacement = (k * dir:Dot(xzPos)) + (speed * (os.clock() + timeOffset))
+			displacement = (k * dir:Dot(xzPos)) + (speed * (SyncedClock:GetTime() + timeOffset))
 		end
 
 		-- Calculate displacement on every axis (xyz)
