@@ -6,39 +6,36 @@
 
     Source: https://github.com/Kenji-Shore/Roblox-Client-Server-Time-Sync-Module
     DevForum post: https://devforum.roblox.com/t/high-precision-clock-syncing-tech-between-clients-and-server-with-accuracy-of-1ms/769346
+
+    Slightly adapted from source. (mostly for convenience / consistency to other scripts)
 ]]
+
+local RunService = game:GetService("RunService")
+local Players = game:GetService("Players")
 
 local module = {}
 
------------------------------------------------------------------------------------------------------
---SERVICES
------------------------------------------------------------------------------------------------------
-local runService = game:GetService("RunService")
-local players = game:GetService("Players")
-
------------------------------------------------------------------------------------------------------
---MAIN DEFINITIONS
------------------------------------------------------------------------------------------------------
 local clockSyncSignal = script.Parent:WaitForChild("ClockSyncRemote")
 
------------------------------------------------------------------------------------------------------
---CODE
------------------------------------------------------------------------------------------------------
-local isClient = runService:IsClient()
+local isClient = RunService:IsClient()
 
-function module:GetTime(overwriteTick) --Not recommended to use this on the client upon join because it takes a few seconds to calibrate. The initial values may be extremely off. OverwriteTick is a tick() value you can pass in if you want to figure out the synced time at an earlier point in time.
+--Not recommended to use this on the client upon join because it takes a few seconds to calibrate. 
+-- The initial values may be extremely off. 
+-- OverwriteTick is a os.clock() value you can pass in if you want to figure out the synced time at an earlier point in time.
+function module:GetTime(overwriteTick)
 	if isClient then
-		return (overwriteTick or tick()) + self.ServerOffset
+		return (overwriteTick or os.clock()) + self.ServerOffset
 	else
-		return (overwriteTick or tick())
+		return (overwriteTick or os.clock())
 	end
 end
 
 if isClient then
+    -- Setup client
 	function module:OnClientEvent(serverSentTick, delayVal)
 		self.TimeDelay = delayVal
 		self.LastSentTick = serverSentTick
-		self.ReceiveTick = tick()
+		self.ReceiveTick = os.clock()
 	end
 
 	function module:AddOffsetValue(newOffsetValue)
@@ -52,7 +49,7 @@ if isClient then
 		local sum = 0
 		local taken = {}
 		local total = ((count < 50) and count) or (count - 10)
-		for i = 1, total do
+		for _ = 1, total do
 			local smallestDiff, smallestIndex
 			for j = 1, count do
 				if not taken[j] then
@@ -70,6 +67,7 @@ if isClient then
 		self.ServerOffset = sum / total
 	end
 else
+    -- Setup server
 	function module:PlayerAdded(player)
 		self.TimeDelays[player] = 0
 	end
@@ -80,21 +78,25 @@ else
 
 	function module:OnServerEvent(player, originalSentTick, processingDelay)
 		if self.TimeDelays[player] then
-			local roundTripTime = tick() - originalSentTick
+			local roundTripTime = os.clock() - originalSentTick
 			self.TimeDelays[player] = 0.5 * (roundTripTime - processingDelay)
 		end
 	end
 end
 
-function module:Heartbeat(step) --Hook this to runService.Heartbeat for proper operation.
+-- Update offset, hook this to RunService.Heartbeat for proper operation.
+function module:Heartbeat(step) 
 	if isClient then
 		self.ReplicationPressure = self.ReplicationPressure * 0.8 + (self.Tally / step) * 0.2
 		self.Tally = 0
 
 		if self.LastSentTick then
-			if self.ReplicationPressure < self.Threshold then --We do not modify the serverOffset value when we are experiencing sufficiently high network load. This is also experienced on game join, so don't expect a synced time for the first few seconds upon joining.
-				local currentTick = tick()
-				local newOffsetValue = (self.LastSentTick + self.TimeDelay) - currentTick --Add current client tick to offset value to get the synced time, aka tick() of the server at that instant.
+            -- We do not modify the serverOffset value when we are experiencing sufficiently high network load. 
+            -- This is also experienced on game join, so don't expect a synced time for the first few seconds upon joining.
+			if self.ReplicationPressure < self.Threshold then
+				local currentTick = os.clock()
+                -- Add current client tick to offset value to get the synced time, aka os.clock() of the server at that instant.
+				local newOffsetValue = (self.LastSentTick + self.TimeDelay) - currentTick 
 
 				self:AddOffsetValue(newOffsetValue)
 
@@ -103,16 +105,17 @@ function module:Heartbeat(step) --Hook this to runService.Heartbeat for proper o
 			self.LastSentTick = nil
 		end
 	else
-		for _, player in ipairs(players:GetPlayers()) do
+		for _, player in ipairs(Players:GetPlayers()) do
 			if self.TimeDelays[player] then
-				clockSyncSignal:FireClient(player, tick(), self.TimeDelays[player])
+				clockSyncSignal:FireClient(player, os.clock(), self.TimeDelays[player])
 			end
 		end
 	end
 end
 
+-- Initialize clock and setup connections
 function module:Initialize()
-	runService.Heartbeat:connect(function(step)
+	RunService.Heartbeat:connect(function(step)
 		self:Heartbeat(step)
 	end)
 
@@ -139,11 +142,11 @@ function module:Initialize()
 	else
 		self.TimeDelays = {}
 
-		players.PlayerAdded:connect(function(player)
+		Players.PlayerAdded:connect(function(player)
 			self:PlayerAdded(player)
 		end)
 
-		players.PlayerRemoving:connect(function(player)
+		Players.PlayerRemoving:connect(function(player)
 			self:PlayerRemoving(player)
 		end)
 

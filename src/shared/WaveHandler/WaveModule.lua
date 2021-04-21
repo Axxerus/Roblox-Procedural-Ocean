@@ -435,7 +435,7 @@ function Wave:AddPlayerFloat(player)
 	-- table.insert(self._connections, connection)
 end
 
--- Update wave's bones on RenderStepped (only done client-side)
+-- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate()
 	if RunService:IsClient() then
 		local frameDivisionCount = 25 -- Amount of frames to divide work over
@@ -460,7 +460,7 @@ function Wave:ConnectUpdate()
 		end
 
 		local currentBatch = 1
-		local connection = RunService.RenderStepped:Connect(function(dt)
+		local connection = RunService.Stepped:Connect(function(_, dt)
 			debug.profilebegin("Update bones of wave")
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
