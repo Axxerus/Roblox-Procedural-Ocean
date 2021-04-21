@@ -1,6 +1,24 @@
 local Players = game:GetService("Players")
 
-local Wave = require(game:GetService("ReplicatedStorage"):WaitForChild("Common"):WaitForChild("WaveModule"))
+local common = game:GetService("ReplicatedStorage"):WaitForChild("Common")
+local Wave = require(common:WaitForChild("WaveModule"))
+local WindLines = require(common:WaitForChild("WindLines"))
+
+-- Create WindLines
+WindLines:Init({
+	Direction = Vector3.new(1, 0, 0.5),
+	Speed = 18,
+	Lifetime = 8,
+	SpawnRate = 8,
+	TrailSettings = {
+		WidthScale = NumberSequence.new({
+			NumberSequenceKeypoint.new(0, 0),
+			NumberSequenceKeypoint.new(0.4, 0.4),
+			NumberSequenceKeypoint.new(0.7, 1),
+			NumberSequenceKeypoint.new(1, 0.3),
+		}),
+	},
+})
 
 local plane = workspace:WaitForChild("Ocean"):WaitForChild("Plane")
 local LocalPlayer = Players.LocalPlayer
@@ -40,12 +58,12 @@ local storm = {
 		Steepness = 0.4,
 		Direction = Vector2.new(-1, -1),
 	},
-    Wave2 = {
+	Wave2 = {
 		WaveLength = 75,
 		Steepness = 0.4,
 		Direction = Vector2.new(1, -5),
 	},
-    Wave3 = {
+	Wave3 = {
 		WaveLength = 250,
 		Steepness = 0.25,
 		Direction = Vector2.new(1, 0),
