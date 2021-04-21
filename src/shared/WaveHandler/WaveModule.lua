@@ -247,8 +247,8 @@ end
 -- Make a part float on the waves
 function Wave:AddFloatingPart(part, posDrag)
 	local numberOfAttachments = 4
-	local positionDrag = posDrag or 0.25
-	local rotationalDrag = 1
+	local positionDrag = posDrag or 0.3
+	local rotationalDrag = 0.5
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -360,11 +360,13 @@ function Wave:AddFloatingPart(part, posDrag)
 			-- (middle of) part is out of water! remove rotational drag the further it goes from the water
 			difference = (difference ^ 2) / 4
 		end
-		waterDragTorque.MaxTorque = Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
-			* largestSize
-			* part.AssemblyMass
-			* workspace.Gravity
-			/ difference
+		waterDragTorque.MaxTorque = (
+				Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
+				* largestSize
+				* part.AssemblyMass
+				* workspace.Gravity
+				/ difference
+			)
 			* rotationalDrag
 
 		-- Parts might have been added to the assembly, so update the cancelGravity force

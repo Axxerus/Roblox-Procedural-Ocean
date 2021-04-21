@@ -7,18 +7,18 @@ local calm = {
 	Gravity = 7,
 	MaxDistance = 500,
 	Wave1 = {
-		WaveLength = 100,
-		Steepness = 0.15,
+		WaveLength = 50,
+		Steepness = 0.2,
 		Direction = Vector2.new(1, 0),
 	},
 	Wave2 = {
-		WaveLength = 200,
-		Steepness = 0.25,
+		WaveLength = 100,
+		Steepness = 0.1,
 		Direction = Vector2.new(0, 0.75),
 	},
 	Wave3 = {
-		WaveLength = 125,
-		Steepness = 0.25,
+		WaveLength = 75,
+		Steepness = 0.15,
 		Direction = Vector2.new(0.25, -0.3),
 	},
 }
@@ -57,7 +57,7 @@ local tsunami = {
 }
 
 -- Create a new wave object on the server
-local wave = WaveModule.new(plane, tsunami)
+local wave = WaveModule.new(plane, calm)
 
 local part = boat.Ballast
 part:SetNetworkOwner(nil)
