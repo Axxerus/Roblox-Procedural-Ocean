@@ -1,3 +1,12 @@
+--[[
+	Module that handles interpolation of bones.
+	This is done so that work can be divided over several frames, 
+	instead of recalculating every bones' offset every frame.
+
+	TweenService seems to be quite laggy / unreliable when tweening large amounts of bones very frequently.
+	This module resolves that.
+]]
+
 local RunService = game:GetService("RunService")
 
 local Interpolate = {}

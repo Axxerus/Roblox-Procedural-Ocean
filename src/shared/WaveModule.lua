@@ -1,6 +1,9 @@
+--[[
+	Main module that handles waves.
+]]
+
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
-local TweenService = game:GetService("TweenService")
 
 local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
 
@@ -389,8 +392,7 @@ function Wave:ConnectRenderStepped()
 
 	local currentBatch = 1
 	local connection = RunService.RenderStepped:Connect(function(dt)
-		local time = os.clock()
-
+		debug.profilebegin("Update bones of wave")
 		if currentBatch > #batches then
 			-- Reset currentBatch to 1
 			currentBatch = 1
@@ -419,7 +421,7 @@ function Wave:ConnectRenderStepped()
 			end
 		end
 		currentBatch += 1
-		print(os.clock() - time)
+		debug.profileend()
 	end)
 
 	table.insert(self._connections, connection)
