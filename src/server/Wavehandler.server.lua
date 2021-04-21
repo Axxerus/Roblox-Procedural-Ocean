@@ -57,7 +57,7 @@ local tsunami = {
 }
 
 -- Create a new wave object on the server
-local wave = WaveModule.new(plane, calm)
+local wave = WaveModule.new(plane, tsunami)
 
 local part = boat.Ballast
 part:SetNetworkOwner(nil)

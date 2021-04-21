@@ -95,7 +95,7 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 			if typeof(v) == "table" then
 				-- Insert in wave settings table
 				waveSettings[i] = v
-				waveCounter +=1
+				waveCounter += 1
 			else
 				-- Insert in general settings table
 				generalSettings[i] = v
@@ -144,7 +144,7 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 			-- Effect will be LOCAL only!
 
 			-- Sort settings
-			local generalSettings, waveSettings, waveCounter= sortSettings()
+			local generalSettings, waveSettings, waveCounter = sortSettings()
 
 			if waveCounter >= 1 then
 				setupFlatModels()
@@ -157,7 +157,7 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		end
 	else
 		-- Setup for server
-		local generalSettings, waveSettings, waveCounter= sortSettings()
+		local generalSettings, waveSettings, waveCounter = sortSettings()
 		if waveCounter >= 1 then
 			local meta = createMeta(generalSettings, waveSettings)
 
@@ -210,9 +210,11 @@ end
 
 -- Get the height of a point at a certain xz-position
 function Wave:GetHeight(xzPos, timeOffset)
+	-- First calculate xzPosition with offset
 	local w = self:GerstnerWave(xzPos, timeOffset)
 	local correctedXZPos = Vector2.new(xzPos.X + w.X, xzPos.Y + w.Z)
 
+	-- Now calculate the height from this offset position
 	local heightOffset = self:GerstnerWave(correctedXZPos, timeOffset).Y
 	return heightOffset
 end
@@ -245,7 +247,8 @@ end
 -- Make a part float on the waves
 function Wave:AddFloatingPart(part, posDrag)
 	local numberOfAttachments = 4
-	local positionDrag = posDrag or 0.45
+	local positionDrag = posDrag or 0.25
+	local rotationalDrag = 1
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -309,7 +312,7 @@ function Wave:AddFloatingPart(part, posDrag)
 
 	RunService.Stepped:Connect(function()
 		local depthBeforeSubmerged = 50
-		local displacementAmount = 0.9
+		local displacementAmount = 1
 
 		-- Force per attachment
 		for attachment, force in pairs(attachments) do
@@ -362,6 +365,7 @@ function Wave:AddFloatingPart(part, posDrag)
 			* part.AssemblyMass
 			* workspace.Gravity
 			/ difference
+			* rotationalDrag
 
 		-- Parts might have been added to the assembly, so update the cancelGravity force
 		cancelGravity.Force = Vector3.new(0, workspace.Gravity * part.AssemblyMass, 0)
