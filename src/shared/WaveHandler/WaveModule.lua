@@ -375,7 +375,7 @@ end
 function Wave:AddPlayerFloat(player)
 	local char = player.Character or player.CharacterAdded:Wait()
 	local rootPart = char:WaitForChild("HumanoidRootPart")
-	local humanoid = char:WaitForChild("Humanoid")
+	--local humanoid = char:WaitForChild("Humanoid")
 
 	self:AddFloatingPart(rootPart, 3)
 
@@ -478,7 +478,7 @@ function Wave:ConnectUpdate(frameDivisionCount)
 					for _, bone in pairs(batches[currentBatch]) do
 						local worldPos = bone.WorldPosition
 						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
-							-- Bone is close enough; calculate offset
+							-- Bone is close enough to camera; calculate offset
 							local timeOffset = dt * frameDivisionCount
 							local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
 
