@@ -35,7 +35,7 @@ floatPart.Color = Color3.fromRGB(65, 36, 17)
 --boatClone.Parent = workspace
 
 local wave = Wave.new(plane, {ListenToServer = true})
-wave:ConnectUpdate()
+wave:ConnectUpdate(25)
 
 --wave:AddFloatingPart(floatPart)
 --wave:AddFloatingPart(boatClone:WaitForChild("Ballast"))

@@ -442,9 +442,8 @@ function Wave:AddPlayerFloat(player)
 end
 
 -- Update wave's bones on Stepped (only done client-side)
-function Wave:ConnectUpdate()
+function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
-		local frameDivisionCount = 25 -- Amount of frames to divide work over
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
