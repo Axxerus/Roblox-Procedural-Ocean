@@ -71,15 +71,15 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		}
 		for _, pos in pairs(positions) do
 			if instance then
-				instance = instance:Clone()
+				local clone = instance:Clone()
 				-- Cleanup clone
-				for _, v in pairs(instance:GetDescendants()) do
+				for _, v in pairs(clone:GetDescendants()) do
 					if v:IsA("Bone") then
 						v:Destroy()
 					end
 				end
-				instance.Position = pos
-				instance.Parent = folder
+				clone.Position = pos
+				clone.Parent = folder
 			end
 		end
 	end
@@ -472,30 +472,39 @@ function Wave:ConnectUpdate()
 				-- Reset currentBatch to 1
 				currentBatch = 1
 			end
-			for _, bone in pairs(batches[currentBatch]) do
-				-- Check if bone is close enough to character
-				local worldPos = bone.WorldPosition
-				local char = LocalPlayer.Character
-				if char then
-					local rootPart = char:FindFirstChild("HumanoidRootPart")
-					if
-						rootPart
-						and (rootPart.Position - worldPos).Magnitude <= self.generalSettings.MaxDistance
-					then
-						-- Transform bone
-						local timeOffset = dt * frameDivisionCount
-						local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
-						-- Smoothly interpolate bone to position
-						Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
-					else
-						-- Clear transformation
-						if bone.Transform ~= CFrame.new() then
-							bone.Transform = CFrame.new()
+
+			local camera = workspace.CurrentCamera
+			if camera then
+				local camPos = camera.CFrame.Position
+				if camPos then
+					for _, bone in pairs(batches[currentBatch]) do
+						local worldPos = bone.WorldPosition
+						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
+							-- Bone is close enough; calculate offset
+							local timeOffset = dt * frameDivisionCount
+							local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+
+							-- Make transform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
+							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
+							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
+							local difference =
+								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
+							if difference < 0.1 then
+								transform *= difference
+							end
+
+							-- Smoothly interpolate bone to position
+							Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
+						else
+							-- Clear transformation
+							if bone.Transform ~= CFrame.new() then
+								bone.Transform = CFrame.new()
+							end
 						end
 					end
 				end
+				currentBatch += 1
 			end
-			currentBatch += 1
 			debug.profileend()
 		end)
 
