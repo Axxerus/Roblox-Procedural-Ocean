@@ -444,6 +444,7 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
+		frameDivisionCount = frameDivisionCount or 20
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
@@ -488,7 +489,7 @@ function Wave:ConnectUpdate(frameDivisionCount)
 							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
 							local difference =
 								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
-							if difference < 0.1 then
+							if difference < 0.2 then
 								transform *= difference
 							end
 
