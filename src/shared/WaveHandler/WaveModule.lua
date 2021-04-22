@@ -3,7 +3,6 @@
 ]]
 
 local RunService = game:GetService("RunService")
-local Players = game:GetService("Players")
 
 local requestSettings = script.Parent:WaitForChild("RequestSettings")
 local settingsChanged = script.Parent:WaitForChild("SettingsChanged")
@@ -14,7 +13,6 @@ local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
 
 SyncedClock:Initialize()
 
-local LocalPlayer = Players.LocalPlayer
 -- Default wave settings
 local default = {
 	WaveLength = 100,
@@ -489,7 +487,7 @@ function Wave:ConnectUpdate(frameDivisionCount)
 							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
 							local difference =
 								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
-							if difference < 0.2 then
+							if difference < 0.15 then
 								transform *= difference
 							end
 
