@@ -10,17 +10,36 @@
     Slightly adapted from source. (mostly for convenience / consistency to other scripts)
 ]]
 
+local remoteName = "ClockSyncRemote"
+
 local RunService = game:GetService("RunService")
 local Players = game:GetService("Players")
 
 local module = {}
 
-local clockSyncSignal = script.Parent:WaitForChild("ClockSyncRemote")
+local function createRemote()
+	local remote = script.Parent:FindFirstChild(remoteName)
+	if not remote then
+		if RunService:IsClient() then
+			-- Wait for remote on the client(s)
+			warn("Remote has not been setup on the server yet. Waiting for creation.")
+			remote = script.Parent:WaitForChild(remoteName)
+		else
+			-- Create remote on the server
+			remote = Instance.new("RemoteEvent")
+			remote.Name = remoteName
+			remote.Parent = script.Parent
+		end
+	end
+	return remote
+end
+
+local clockSyncSignal = createRemote()
 
 local isClient = RunService:IsClient()
 
---Not recommended to use this on the client upon join because it takes a few seconds to calibrate. 
--- The initial values may be extremely off. 
+--Not recommended to use this on the client upon join because it takes a few seconds to calibrate.
+-- The initial values may be extremely off.
 -- OverwriteTick is a os.clock() value you can pass in if you want to figure out the synced time at an earlier point in time.
 function module:GetTime(overwriteTick)
 	if isClient then
@@ -31,7 +50,7 @@ function module:GetTime(overwriteTick)
 end
 
 if isClient then
-    -- Setup client
+	-- Setup client
 	function module:OnClientEvent(serverSentTick, delayVal)
 		self.TimeDelay = delayVal
 		self.LastSentTick = serverSentTick
@@ -67,7 +86,7 @@ if isClient then
 		self.ServerOffset = sum / total
 	end
 else
-    -- Setup server
+	-- Setup server
 	function module:PlayerAdded(player)
 		self.TimeDelays[player] = 0
 	end
@@ -85,18 +104,18 @@ else
 end
 
 -- Update offset, hook this to RunService.Heartbeat for proper operation.
-function module:Heartbeat(step) 
+function module:Heartbeat(step)
 	if isClient then
 		self.ReplicationPressure = self.ReplicationPressure * 0.8 + (self.Tally / step) * 0.2
 		self.Tally = 0
 
 		if self.LastSentTick then
-            -- We do not modify the serverOffset value when we are experiencing sufficiently high network load. 
-            -- This is also experienced on game join, so don't expect a synced time for the first few seconds upon joining.
+			-- We do not modify the serverOffset value when we are experiencing sufficiently high network load.
+			-- This is also experienced on game join, so don't expect a synced time for the first few seconds upon joining.
 			if self.ReplicationPressure < self.Threshold then
 				local currentTick = os.clock()
-                -- Add current client tick to offset value to get the synced time, aka os.clock() of the server at that instant.
-				local newOffsetValue = (self.LastSentTick + self.TimeDelay) - currentTick 
+				-- Add current client tick to offset value to get the synced time, aka os.clock() of the server at that instant.
+				local newOffsetValue = (self.LastSentTick + self.TimeDelay) - currentTick
 
 				self:AddOffsetValue(newOffsetValue)
 

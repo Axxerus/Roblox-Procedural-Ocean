@@ -2,10 +2,36 @@
 	Main module that handles waves.
 ]]
 
+local requestName = "RequestSettings"
+local changedName = "SettingsChanged"
+
 local RunService = game:GetService("RunService")
 
-local requestSettings = script.Parent:WaitForChild("RequestSettings")
-local settingsChanged = script.Parent:WaitForChild("SettingsChanged")
+-- Create remotes on server or wait for creation on client
+local function createRemotes()
+	local request, changed = script.Parent:FindFirstChild(requestName), script.Parent:FindFirstChild(changedName)
+	if not request or not changed then
+		if RunService:IsClient() then
+			-- Wait for server to create remotes
+			warn("Remotes have not been setup on the server yet. Waiting for creation.")
+			request = script.Parent:WaitForChild(requestName)
+			changed = script.Parent:WaitForChild(changedName)
+		else
+			-- Only create Remotes on the server
+			request = Instance.new("RemoteFunction")
+			request.Name = requestName
+			request.Parent = script.Parent
+
+			changed = Instance.new("RemoteEvent")
+			changed.Name = changedName
+			changed.Parent = script.Parent
+		end
+	end
+	return request, changed
+end
+
+-- Get or create Remotes
+local requestSettings, settingsChanged = createRemotes()
 
 -- Modules
 local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
