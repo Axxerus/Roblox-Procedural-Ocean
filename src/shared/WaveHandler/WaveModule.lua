@@ -255,7 +255,7 @@ function Wave:UpdateCachedVars()
 
 		-- Variables that don't change on tick
 		local k = (2 * math.pi) / waveLength
-		local speed = math.sqrt(gravity * (2 * math.pi / waveLength))
+		local speed = math.sqrt(gravity * k)
 		local dir = direction.Unit
 		local amplitude = steepness / k
 
