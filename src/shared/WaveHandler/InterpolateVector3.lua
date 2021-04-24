@@ -15,7 +15,7 @@ Interpolate.__index = Interpolate
 function Interpolate.new()
 	local meta = setmetatable({
 		_connections = {},
-		_bones = {},
+		instances = {},
 	}, Interpolate)
 
 	-- Setup connection
@@ -27,26 +27,33 @@ function Interpolate.new()
 	return meta
 end
 
--- Add a transform interpolation for a bone
-function Interpolate:AddInterpolation(bone, destPos, frames)
-    local increment = (destPos - bone.Transform.Position) / frames
-	self._bones[bone] = {
+-- Add interpolation for an instance
+function Interpolate:AddInterpolation(instance, property, destPos, frames)
+    local increment
+	if typeof(instance[property]) == "CFrame" then
+		-- For bones
+		increment = (destPos - instance[property].Position) / frames
+	else
+		increment = (destPos - instance[property]) / frames
+	end
+	self.instances[instance] = {
 		Increment = increment,
 		ElapsedFrames = 0,
         MaxFrames = frames,
+		Property = property,
 	}
 end
 
 -- Update all transformations
 function Interpolate:Update()
-	for bone, settings in pairs(self._bones) do
-		if bone and settings then
+	for instance, settings in pairs(self.instances) do
+		if instance and settings then
 			if settings.ElapsedFrames > settings.MaxFrames then
-                -- Clear bone from table
-				self._bones[bone] = nil
+                -- Clear instance from table
+				self.instances[instance] = nil
 			else
-                -- Transform bone smoothly based on amount of frames animation has to take
-				bone.Transform += settings.Increment
+                -- Increment property and elapsed frame
+				instance[settings.Property] += settings.Increment
 				settings.ElapsedFrames += 1
 			end
 		end

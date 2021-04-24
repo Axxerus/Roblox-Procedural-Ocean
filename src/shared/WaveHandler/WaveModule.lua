@@ -34,7 +34,7 @@ end
 local requestSettings, settingsChanged = createRemotes()
 
 -- Modules
-local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
+local Interpolation = require(script.Parent:WaitForChild("InterpolateVector3")).new()
 local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
 
 SyncedClock:Initialize()
@@ -269,10 +269,11 @@ function Wave:UpdateCachedVars()
 end
 
 -- Make a part float on the waves
-function Wave:AddFloatingPart(part, posDrag)
+function Wave:AddFloatingPart(part, frameDivisionCount)
 	local numberOfAttachments = 4
-	local positionDrag = posDrag or 0.4
+	local positionDrag = 0.4
 	local rotationalDrag = 0.1
+	frameDivisionCount = frameDivisionCount or 4 -- Amount of frames to divide calculations over
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -404,7 +405,7 @@ function Wave:AddPlayerFloat(player)
 	local rootPart = char:WaitForChild("HumanoidRootPart")
 	--local humanoid = char:WaitForChild("Humanoid")
 
-	self:AddFloatingPart(rootPart, 3)
+	self:AddFloatingPart(rootPart)
 
 	-- Setup BodyForces
 	-- local dirVelocity
@@ -507,19 +508,17 @@ function Wave:ConnectUpdate(frameDivisionCount)
 						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
 							-- Bone is close enough to camera; calculate offset
 							local timeOffset = dt * frameDivisionCount
-							local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+							local destTransform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
 
-							-- Make transform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
+							-- Make destTransform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
 							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
 							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
 							local difference =
 								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
 							if difference < 0.15 then
-								transform *= difference
+								destTransform *= difference
 							end
-
-							-- Smoothly interpolate bone to position
-							Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
+							Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
 						else
 							-- Clear transformation
 							if bone.Transform ~= CFrame.new() then
