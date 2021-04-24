@@ -269,11 +269,10 @@ function Wave:UpdateCachedVars()
 end
 
 -- Make a part float on the waves
-function Wave:AddFloatingPart(part, frameDivisionCount)
+function Wave:AddFloatingPart(part)
 	local numberOfAttachments = 4
 	local positionDrag = 0.4
 	local rotationalDrag = 0.1
-	frameDivisionCount = frameDivisionCount or 4 -- Amount of frames to divide calculations over
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -293,7 +292,7 @@ function Wave:AddFloatingPart(part, frameDivisionCount)
 		Vector3.new(-x, -y, z),
 		Vector3.new(-x, -y, -z),
 	}
-	local attachments = {}
+	local attachmentForces = {}
 	-- Create attachments and their forces
 	for index, relativePos in pairs(corners) do
 		local attach = Instance.new("Attachment")
@@ -310,7 +309,7 @@ function Wave:AddFloatingPart(part, frameDivisionCount)
 		force.Enabled = true
 		force.ApplyAtCenterOfMass = false
 		force.Parent = part
-		attachments[attach] = force
+		attachmentForces[attach] = force
 	end
 
 	-- Create angular drag
@@ -340,7 +339,7 @@ function Wave:AddFloatingPart(part, frameDivisionCount)
 		local displacementAmount = 1
 
 		-- Force per attachment
-		for attachment, force in pairs(attachments) do
+		for attachment, force in pairs(attachmentForces) do
 			local worldPos = attachment.WorldPosition
 			-- Calculate wave height at the attachment's position
 			local waveHeight = self._instance.Position.Y + self:GetHeight(Vector2.new(worldPos.X, worldPos.Z))
