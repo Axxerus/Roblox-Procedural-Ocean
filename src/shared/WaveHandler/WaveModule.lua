@@ -209,7 +209,7 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 
 		-- Get cached variables (they don't need to be recalculated every frame)
 		local cached = self._cachedVars[waveName]
-		local w = cached["w"]
+		local period = cached["Period"]
 		local speed = cached["WaveSpeed"]
 		local dir = cached["UnitDirection"]
 		local amplitude = cached["Amplitude"]
@@ -217,9 +217,9 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 		-- Calculate displacement whilst taking into account the time offset
 		local displacement
 		if not timeOffset then
-			displacement = (w * dir:Dot(xzPos)) + (speed * SyncedClock:GetTime())
+			displacement = (period * dir:Dot(xzPos)) + (speed * SyncedClock:GetTime())
 		else
-			displacement = (w * dir:Dot(xzPos)) + (speed * (SyncedClock:GetTime() + timeOffset))
+			displacement = (period * dir:Dot(xzPos)) + (speed * (SyncedClock:GetTime() + timeOffset))
 		end
 
 		-- Calculate displacement on every axis (xyz)
@@ -254,13 +254,13 @@ function Wave:UpdateCachedVars()
 		local steepness = waveSetting.Steepness or self.generalSettings.Steepness or default.Steepness
 
 		-- Variables that don't change on tick
-		local w = (2 * math.pi) / waveLength
-		local speed = math.sqrt(gravity * w)
+		local period = (2 * math.pi) / waveLength
+		local speed = math.sqrt(gravity * period)
 		local dir = direction.Unit
-		local amplitude = steepness / w
+		local amplitude = steepness / period
 
 		self._cachedVars[waveName] = {
-			w = w,
+			Period = period,
 			WaveSpeed = speed,
 			UnitDirection = dir,
 			Amplitude = amplitude,
