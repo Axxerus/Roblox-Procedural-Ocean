@@ -34,8 +34,10 @@ end
 local requestSettings, settingsChanged = createRemotes()
 
 -- Modules
-local Interpolation = require(script.Parent:WaitForChild("InterpolateVector3")).new()
-local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
+local parent = script.Parent
+local Interpolation = require(parent:WaitForChild("InterpolateVector3")).new()
+local SyncedClock = require(parent:WaitForChild("ClockSync"))
+local InfiniteTiling = require(parent:WaitForChild("InfiniteTilingHandler"))
 
 SyncedClock:Initialize()
 
@@ -71,41 +73,6 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 
 	if not bones or #bones <= 0 then
 		error("No bones have been found inside the chosen model!")
-	end
-
-	-- Setup (flat) sea models around animated sea (create illusion of infinite sea)
-	local function setupFlatModels()
-		local folder = Instance.new("Folder")
-		folder.Name = "SeaParts"
-		folder.Parent = workspace
-		local p = instance.Position
-		local s = instance.Size
-		local positions = {
-			-- Main Row (2)
-			p + Vector3.new(-s.X, 0, 0),
-			p + Vector3.new(s.X, 0, 0),
-			-- Top Row (3)
-			p + Vector3.new(-s.X, 0, s.Z),
-			p + Vector3.new(0, 0, s.Z),
-			p + Vector3.new(s.X, 0, s.Z),
-			-- Bottom Row (3)
-			p + Vector3.new(-s.X, 0, -s.Z),
-			p + Vector3.new(0, 0, -s.Z),
-			p + Vector3.new(s.X, 0, -s.Z),
-		}
-		for _, pos in pairs(positions) do
-			if instance then
-				local clone = instance:Clone()
-				-- Cleanup clone
-				for _, v in pairs(clone:GetDescendants()) do
-					if v:IsA("Bone") then
-						v:Destroy()
-					end
-				end
-				clone.Position = pos
-				clone.Parent = folder
-			end
-		end
 	end
 
 	-- Sort settings into two tables:
@@ -146,7 +113,8 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 			-- Listen to SERVER for getting settings
 			-- Don't create settings locally
 
-			setupFlatModels()
+			-- Setup tiles around ocean
+			InfiniteTiling.Setup(instance)
 
 			-- Request settings from server (RemoteFunction)
 			local generalSettings, waveSettings = requestSettings:InvokeServer()
@@ -171,8 +139,6 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 			local generalSettings, waveSettings, waveCounter = sortSettings()
 
 			if waveCounter >= 1 then
-				setupFlatModels()
-
 				-- Return "Wave" object
 				return createMeta(generalSettings, waveSettings)
 			else
@@ -343,8 +309,11 @@ function Wave:AddFloatingPart(part)
 			local worldPos = attachment.WorldPosition
 			-- Calculate wave height at the attachment's position
 			local waveHeight = self._instance.Position.Y + self:GetHeight(Vector2.new(worldPos.X, worldPos.Z))
-			local displacementMultiplier =
-				math.clamp((waveHeight - worldPos.Y) / depthBeforeSubmerged * displacementAmount, 0, 1)
+			local displacementMultiplier = math.clamp(
+				(waveHeight - worldPos.Y) / depthBeforeSubmerged * displacementAmount,
+				0,
+				1
+			)
 
 			-- Set force of attachment
 			local destForce
@@ -469,6 +438,7 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
+		local LocalPlayer = game:GetService("Players").LocalPlayer
 		frameDivisionCount = frameDivisionCount or 20
 
 		-- Generate tables containing small(er) batches of bones
@@ -493,6 +463,19 @@ function Wave:ConnectUpdate(frameDivisionCount)
 		local currentBatch = 1
 		local connection = RunService.Stepped:Connect(function(_, dt)
 			debug.profilebegin("Update bones of wave")
+
+			-- Update tiles
+			local tilesUpdated = InfiniteTiling.SteppedFunction(dt)
+
+			local char = LocalPlayer.Character
+			if not char then
+				return
+			end
+			local rootPart = char:FindFirstChild("HumanoidRootPart")
+			if not rootPart then
+				return
+			end
+
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
 				currentBatch = 1
@@ -507,13 +490,17 @@ function Wave:ConnectUpdate(frameDivisionCount)
 						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
 							-- Bone is close enough to camera; calculate offset
 							local timeOffset = dt * frameDivisionCount
+							
 							local destTransform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
 
 							-- Make destTransform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
 							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
 							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
-							local difference =
-								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
+							local difference = math.clamp(
+								1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2),
+								0,
+								1
+							)
 							if difference < 0.15 then
 								destTransform *= difference
 							end
@@ -559,6 +546,10 @@ function Wave:Destroy()
 			warn("Retrying to destory wave, count:", count, "\nError:", response)
 		end
 	end
+
+	-- Remove infinite tiling
+	InfiniteTiling.Destroy()
+
 	-- Cleanup variables
 	self._bones = {}
 	self.generalSettings = {}
