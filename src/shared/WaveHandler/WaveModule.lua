@@ -467,53 +467,57 @@ function Wave:ConnectUpdate(frameDivisionCount)
 			-- Update tiles
 			local tilesUpdated = InfiniteTiling.SteppedFunction(dt)
 
-			local char = LocalPlayer.Character
-			if not char then
-				return
-			end
-			local rootPart = char:FindFirstChild("HumanoidRootPart")
-			if not rootPart then
-				return
-			end
+			if tilesUpdated then
+			else
+				-- Do normal update cycle (tweening)
+				local char = LocalPlayer.Character
+				if not char then
+					return
+				end
+				local rootPart = char:FindFirstChild("HumanoidRootPart")
+				if not rootPart then
+					return
+				end
 
-			if currentBatch > #batches then
-				-- Reset currentBatch to 1
-				currentBatch = 1
-			end
+				if currentBatch > #batches then
+					-- Reset currentBatch to 1
+					currentBatch = 1
+				end
 
-			local camera = workspace.CurrentCamera
-			if camera then
-				local camPos = camera.CFrame.Position
-				if camPos then
-					for _, bone in pairs(batches[currentBatch]) do
-						local worldPos = bone.WorldPosition
-						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
-							-- Bone is close enough to camera; calculate offset
-							local timeOffset = dt * frameDivisionCount
-							
-							local destTransform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+				local camera = workspace.CurrentCamera
+				if camera then
+					local camPos = camera.CFrame.Position
+					if camPos then
+						for _, bone in pairs(batches[currentBatch]) do
+							local worldPos = bone.WorldPosition
+							if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
+								-- Bone is close enough to camera; calculate offset
+								local timeOffset = dt * frameDivisionCount
 
-							-- Make destTransform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
-							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
-							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
-							local difference = math.clamp(
-								1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2),
-								0,
-								1
-							)
-							if difference < 0.15 then
-								destTransform *= difference
-							end
-							Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
-						else
-							-- Clear transformation
-							if bone.Transform ~= CFrame.new() then
-								bone.Transform = CFrame.new()
+								local destTransform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+
+								-- Make destTransform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
+								local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
+								local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
+								local difference = math.clamp(
+									1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2),
+									0,
+									1
+								)
+								if difference < 0.15 then
+									destTransform *= difference
+								end
+								Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
+							else
+								-- Clear transformation
+								if bone.Transform ~= CFrame.new() then
+									bone.Transform = CFrame.new()
+								end
 							end
 						end
 					end
+					currentBatch += 1
 				end
-				currentBatch += 1
 			end
 			debug.profileend()
 		end)

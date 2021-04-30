@@ -1,5 +1,5 @@
 local DEBOUNCE_TIME = 4
-local CHANGE_RADIUS = workspace.Ocean.Plane.Size.X * 0.75
+local CHANGE_RADIUS = 100
 
 local debounce = 0
 local connection
@@ -20,9 +20,7 @@ folder.Name = "SeaParts"
 folder.Parent = workspace
 
 -- Return positions around referencePosition (only for squares)
-local function positionsAroundReference(refPart)
-	local refPos = refPart.Position
-	local length = refPart.Size.X
+local function positionsAroundReference(refPos, length)
 	return {
 		[1] = refPos + Vector3.new(-length, 0, length),
 		[2] = refPos + Vector3.new(0, 0, length),
@@ -45,7 +43,7 @@ local function createPart(source, pos)
 end
 
 -- Update the positions of parts (first do some checks)
-local function updatePartTable(sourcePart)
+local function updatePartTable(refPos)
 	if updateInProgress then
 		return
 	end
@@ -59,22 +57,11 @@ local function updatePartTable(sourcePart)
 	updateInProgress = true
 
 	-- Get new positions
-	local newPositions = positionsAroundReference(sourcePart)
+	local newPositions = positionsAroundReference(refPos, partTable[5].Size.X)
 
 	-- Move parts to new positions
 	for i, newPos in pairs(newPositions) do
-		if not partTable[i] then
-			if i == 5 then
-				-- Use source part
-				partTable[i] = sourcePart
-			else
-				-- First set, create part
-				partTable[i] = createPart(sourcePart, newPos)
-			end
-		else
-			-- Move already created part
-			partTable[i].Position = newPos
-		end
+		partTable[i].Position = Vector3.new(newPos.X, partTable[i].Position.Y, newPos.Z) -- Only move in xz-plane
 	end
 	updateInProgress = false
 end
@@ -85,7 +72,17 @@ local module = {}
 function module.Setup(sourcePart)
 	sourcePart.Parent = folder
 	-- Create parts around source
-	updatePartTable(sourcePart)
+	for i, newPos in pairs(positionsAroundReference(sourcePart.Position, sourcePart.Size.X)) do
+		if i == 5 then
+			-- Use source part
+			partTable[i] = sourcePart
+		else
+			-- First set, create part
+			partTable[i] = createPart(sourcePart, newPos)
+		end
+	end
+
+	CHANGE_RADIUS = sourcePart.Size.X / 4
 end
 
 -- Run this function on Heartbeat or Stepped. Returns true if parts have been moved.
@@ -104,21 +101,7 @@ function module.SteppedFunction(dt)
 
 			if distance > CHANGE_RADIUS then
 				-- Player has walked further than max distance --> update parts
-				local closestPart
-				local closestDistance = math.huge
-				for i, part in pairs(partTable) do
-					if i ~= 5 then -- Don't use middle part
-						local newDistance = (Vector2.new(part.Position.X, part.Position.Z) - Vector2.new(
-							rootPart.Position.X,
-							rootPart.Position.Z
-						)).Magnitude
-						if newDistance < closestDistance then -- If part is closer (by a margin)
-							closestPart = part
-							closestDistance = newDistance
-						end
-					end
-				end
-				updatePartTable(closestPart)
+				updatePartTable(rootPart.Position)
 				return true
 			end
 		end
