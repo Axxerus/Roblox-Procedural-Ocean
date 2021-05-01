@@ -37,7 +37,8 @@ end
 local function createPart(source, pos)
 	local part = source:Clone()
 	part.Position = pos
-	part.Parent = folder
+	part.Name = "Clone"
+	part.Parent = workspace
 	return part
 end
 
@@ -79,14 +80,6 @@ local function updatePartTable(sourcePart)
 		end
 	end
 
-	-- Remove unused parts
-	-- for _, v in pairs(folder:GetChildren()) do
-	-- 	local found = table.find(newTable, v)
-	-- 	if not found then
-	-- 		v:Destroy()
-	-- 	end
-	-- end
-
 	-- Update partsTable
 	for i, v in pairs(newTable) do
 		partTable[i] = v
@@ -98,8 +91,9 @@ end
 local module = {}
 
 -- Setup for Tiles around source
-function module.Setup(sourcePart)
-	sourcePart.Parent = folder
+function module.Setup(sourcePart, detectionRadius)
+	--sourcePart.Parent = folder
+
 	-- Create parts around source
 	for i, newPos in pairs(positionsAroundReference(sourcePart.Position, sourcePart.Size.X)) do
 		if i == 5 then
@@ -112,9 +106,14 @@ function module.Setup(sourcePart)
 	end
 
 	CHANGE_RADIUS = sourcePart.Size.X / 4
+
+	-- Create folder
+	folder = Instance.new("Folder")
+	folder.Name = "SeaParts"
+	folder.Parent = workspace
 end
 
--- Run this function on Heartbeat or Stepped. Returns true if parts have been moved.
+-- Run this function on Heartbeat or Stepped
 function module.SteppedFunction(dt)
 	debounce -= dt
 
@@ -147,7 +146,6 @@ function module.SteppedFunction(dt)
 			if distance > CHANGE_RADIUS then
 				-- Player has walked further than max distance --> update parts
 				updatePartTable(closestPart)
-				return true
 			end
 		end
 	end

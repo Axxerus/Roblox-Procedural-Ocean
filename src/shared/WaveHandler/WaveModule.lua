@@ -438,36 +438,76 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
-		local LocalPlayer = game:GetService("Players").LocalPlayer
 		frameDivisionCount = frameDivisionCount or 20
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
 		local batches = {}
-
 		local batchCounter = 1
 		local boneCounter = 0
-		for _, bone in pairs(self._bones) do
-			if not batches[batchCounter] then
-				batches[batchCounter] = {}
-			end
-			table.insert(batches[batchCounter], bone)
-			boneCounter += 1
-			if boneCounter >= updateBonesAmount then
-				-- Setup new batch
-				boneCounter = 0
-				batchCounter += 1
+
+		local function updateBatches(source)
+			updateBonesAmount = math.round(#source / frameDivisionCount)
+			batchCounter = 1
+			boneCounter = 0
+			for _, bone in pairs(source) do
+				if not batches[batchCounter] then
+					batches[batchCounter] = {}
+				end
+				table.insert(batches[batchCounter], bone)
+				boneCounter += 1
+				if boneCounter >= updateBonesAmount then
+					-- Setup new batch
+					boneCounter = 0
+					batchCounter += 1
+				end
 			end
 		end
+
+		updateBatches(self._bones)
+
+		-- Create cylinder part that is used to update bones around player
+		local detectPart = Instance.new("Part")
+		detectPart.Position = self._instance.Position
+		detectPart.Shape = Enum.PartType.Cylinder
+		detectPart.Orientation = Vector3.new(0, 0, 90)
+		detectPart.Anchored = true
+		detectPart.CanCollide = false
+		detectPart.Size = Vector3.new(100, self.generalSettings.MaxDistance, self.generalSettings.MaxDistance)
+		detectPart.Parent = workspace
 
 		local currentBatch = 1
 		local connection = RunService.Stepped:Connect(function(_, dt)
 			debug.profilebegin("Update bones of wave")
 
-			-- Update tiles
-			local tilesUpdated = InfiniteTiling.SteppedFunction(dt)
+			-- Update tiles (create new if necessary)
+			InfiniteTiling.SteppedFunction(dt)
 
-			local function calculateTransform(refPos)
+			-- Transform bones
+			if currentBatch > #batches then
+				-- Reset currentBatch to 1
+				currentBatch = 1
+
+				-- Move detectPart to new position
+				local char = game:GetService("Players").LocalPlayer.Character
+				if char then
+					local rootPart = char:FindFirstChild("HumanoidRootPart")
+					if rootPart then
+						detectPart.Position = rootPart.Position
+
+						-- Update batches
+						local touching = detectPart:GetTouchingParts()
+						if #touching >= 1 then
+							updateBatches(touching)
+						end
+					end
+				end
+			end
+
+			-- Update this batch
+			for _, bone in pairs(batches[currentBatch]) do
+				local refPos = bone.WorldPosition
+
 				local destTransform = Vector3.new()
 				local camera = workspace.CurrentCamera
 				if camera then
@@ -494,32 +534,12 @@ function Wave:ConnectUpdate(frameDivisionCount)
 					end
 				end
 
-				-- Return empty CFrame if bone is to far away, or calculated offset
-				return destTransform
+				if destTransform then
+					Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
+				end
 			end
+			currentBatch += 1
 
-			if tilesUpdated then
-				for _, bone in pairs(self._bones) do
-					local transform = calculateTransform(bone.WorldPosition)
-					if transform then
-						bone.Transform = CFrame.new(transform)
-					end
-				end
-			else
-				-- Do normal update cycle (with tweening)
-				if currentBatch > #batches then
-					-- Reset currentBatch to 1
-					currentBatch = 1
-				end
-
-				for _, bone in pairs(batches[currentBatch]) do
-					local transform = calculateTransform(bone.WorldPosition)
-					if transform then
-						Interpolation:AddInterpolation(bone, "Transform", transform, frameDivisionCount)
-					end
-				end
-				currentBatch += 1
-			end
 			debug.profileend()
 		end)
 
