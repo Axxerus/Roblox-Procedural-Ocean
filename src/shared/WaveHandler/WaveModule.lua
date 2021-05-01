@@ -438,7 +438,7 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
-		frameDivisionCount = frameDivisionCount or 20
+		frameDivisionCount = frameDivisionCount or 1
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
@@ -472,6 +472,19 @@ function Wave:ConnectUpdate(frameDivisionCount)
 
 			-- Update tiles (create new if necessary)
 			-- InfiniteTiling.SteppedFunction(dt)
+
+			-- Move plane
+			-- local char = game:GetService("Players").LocalPlayer.Character
+			-- if char then
+			-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
+			-- 	if rootPart then
+			-- 		self._instance.Position = Vector3.new(
+			-- 			rootPart.Position.X,
+			-- 			self._instance.Position.Y,
+			-- 			rootPart.Position.Z
+			-- 		)
+			-- 	end
+			-- end
 
 			-- Transform bones
 			if currentBatch > #batches then
@@ -529,6 +542,7 @@ function Wave:ConnectUpdate(frameDivisionCount)
 				end
 
 				if destTransform then
+					bone.Transform = CFrame.new(destTransform)
 					Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
 				end
 			end
