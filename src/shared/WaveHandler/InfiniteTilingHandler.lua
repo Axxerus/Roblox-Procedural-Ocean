@@ -14,9 +14,7 @@ local partTable = {}
 -- 7 = BottomLeft
 -- 8 = BottomMiddle
 -- 9 = BottomRight
-local folder = Instance.new("Folder")
-folder.Name = "SeaParts"
-folder.Parent = workspace
+local folder
 
 -- Return positions around referencePosition (only for squares)
 local function positionsAroundReference(refPos, length)
@@ -38,7 +36,7 @@ local function createPart(source, pos)
 	local part = source:Clone()
 	part.Position = pos
 	part.Name = "Clone"
-	part.Parent = workspace
+	part.Parent = folder
 	return part
 end
 
@@ -91,8 +89,11 @@ end
 local module = {}
 
 -- Setup for Tiles around source
-function module.Setup(sourcePart, detectionRadius)
-	--sourcePart.Parent = folder
+function module.Setup(sourcePart)
+	-- Create folder
+	folder = Instance.new("Folder")
+	folder.Name = "SeaParts"
+	folder.Parent = workspace
 
 	-- Create parts around source
 	for i, newPos in pairs(positionsAroundReference(sourcePart.Position, sourcePart.Size.X)) do
@@ -107,10 +108,7 @@ function module.Setup(sourcePart, detectionRadius)
 
 	CHANGE_RADIUS = sourcePart.Size.X / 4
 
-	-- Create folder
-	folder = Instance.new("Folder")
-	folder.Name = "SeaParts"
-	folder.Parent = workspace
+	-- sourcePart.Parent = folder
 end
 
 -- Run this function on Heartbeat or Stepped

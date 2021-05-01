@@ -466,42 +466,36 @@ function Wave:ConnectUpdate(frameDivisionCount)
 
 		updateBatches(self._bones)
 
-		-- Create cylinder part that is used to update bones around player
-		local detectPart = Instance.new("Part")
-		detectPart.Position = self._instance.Position
-		detectPart.Shape = Enum.PartType.Cylinder
-		detectPart.Orientation = Vector3.new(0, 0, 90)
-		detectPart.Anchored = true
-		detectPart.CanCollide = false
-		detectPart.Size = Vector3.new(100, self.generalSettings.MaxDistance, self.generalSettings.MaxDistance)
-		detectPart.Parent = workspace
-
 		local currentBatch = 1
 		local connection = RunService.Stepped:Connect(function(_, dt)
 			debug.profilebegin("Update bones of wave")
 
 			-- Update tiles (create new if necessary)
-			InfiniteTiling.SteppedFunction(dt)
+			-- InfiniteTiling.SteppedFunction(dt)
 
 			-- Transform bones
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
 				currentBatch = 1
 
-				-- Move detectPart to new position
-				local char = game:GetService("Players").LocalPlayer.Character
-				if char then
-					local rootPart = char:FindFirstChild("HumanoidRootPart")
-					if rootPart then
-						detectPart.Position = rootPart.Position
-
-						-- Update batches
-						local touching = detectPart:GetTouchingParts()
-						if #touching >= 1 then
-							updateBatches(touching)
-						end
-					end
-				end
+				-- Update batches
+				-- local char = game:GetService("Players").LocalPlayer.Character
+				-- if char then
+				-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
+				-- 	if rootPart then
+				-- 		-- Update batches
+				-- 		local newBones = {}
+				-- 		for _, v in pairs(workspace.SeaParts:GetDescendants()) do
+				-- 			if
+				-- 				v:IsA("Bone")
+				-- 				and (v.Position - rootPart.Position).Magnitude <= self.generalSettings.MaxDistance
+				-- 			then
+				-- 				table.insert(newBones, v)
+				-- 			end
+				-- 		end
+				-- 		updateBatches(newBones)
+				-- 	end
+				-- end
 			end
 
 			-- Update this batch
