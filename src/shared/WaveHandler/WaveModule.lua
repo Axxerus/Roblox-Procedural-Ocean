@@ -438,7 +438,7 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
-		frameDivisionCount = frameDivisionCount or 1
+		frameDivisionCount = frameDivisionCount or 25
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
@@ -446,25 +446,37 @@ function Wave:ConnectUpdate(frameDivisionCount)
 		local batchCounter = 1
 		local boneCounter = 0
 
-		local function updateBatches(source)
-			updateBonesAmount = math.round(#source / frameDivisionCount)
-			batchCounter = 1
-			boneCounter = 0
-			for _, bone in pairs(source) do
-				if not batches[batchCounter] then
-					batches[batchCounter] = {}
-				end
-				table.insert(batches[batchCounter], bone)
-				boneCounter += 1
-				if boneCounter >= updateBonesAmount then
-					-- Setup new batch
-					boneCounter = 0
-					batchCounter += 1
-				end
+		-- local function updateBatches(source)
+		-- 	updateBonesAmount = math.round(#source / frameDivisionCount)
+		-- 	batchCounter = 1
+		-- 	boneCounter = 0
+		-- 	for _, bone in pairs(source) do
+		-- 		if not batches[batchCounter] then
+		-- 			batches[batchCounter] = {}
+		-- 		end
+		-- 		table.insert(batches[batchCounter], bone)
+		-- 		boneCounter += 1
+		-- 		if boneCounter >= updateBonesAmount then
+		-- 			-- Setup new batch
+		-- 			boneCounter = 0
+		-- 			batchCounter += 1
+		-- 		end
+		-- 	end
+		-- end
+		-- updateBatches(self._bones)
+
+		for _, bone in pairs(self._bones) do
+			if not batches[batchCounter] then
+				batches[batchCounter] = {}
+			end
+			table.insert(batches[batchCounter], bone)
+			boneCounter += 1
+			if boneCounter >= updateBonesAmount then
+				-- Setup new batch
+				boneCounter = 0
+				batchCounter += 1
 			end
 		end
-
-		updateBatches(self._bones)
 
 		local currentBatch = 1
 		local connection = RunService.Stepped:Connect(function(_, dt)
@@ -486,7 +498,6 @@ function Wave:ConnectUpdate(frameDivisionCount)
 			-- 	end
 			-- end
 
-			-- Transform bones
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
 				currentBatch = 1
@@ -542,7 +553,7 @@ function Wave:ConnectUpdate(frameDivisionCount)
 				end
 
 				if destTransform then
-					bone.Transform = CFrame.new(destTransform)
+					--bone.Transform = CFrame.new(destTransform)
 					Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
 				end
 			end
