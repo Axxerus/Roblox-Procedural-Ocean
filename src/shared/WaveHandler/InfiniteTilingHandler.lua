@@ -2,7 +2,6 @@ local DEBOUNCE_TIME = 4
 local CHANGE_RADIUS = 100
 
 local debounce = 0
-local connection
 local updateInProgress = false
 local partTable = {}
 -- Standard configuration (indexes of table):
@@ -43,7 +42,7 @@ local function createPart(source, pos)
 end
 
 -- Update the positions of parts (first do some checks)
-local function updatePartTable(refPos)
+local function updatePartTable(sourcePart)
 	if updateInProgress then
 		return
 	end
@@ -57,12 +56,42 @@ local function updatePartTable(refPos)
 	updateInProgress = true
 
 	-- Get new positions
-	local newPositions = positionsAroundReference(refPos, partTable[5].Size.X)
+	local newPositions = positionsAroundReference(sourcePart)
 
-	-- Move parts to new positions
-	for i, newPos in pairs(newPositions) do
-		partTable[i].Position = Vector3.new(newPos.X, partTable[i].Position.Y, newPos.Z) -- Only move in xz-plane
+	local newTable = {}
+	for index, newPos in pairs(newPositions) do
+		if index == 5 then
+			-- Use sourcePart in the middle
+			newTable[index] = sourcePart
+			newTable[index].Color = Color3.fromRGB(255, 0, 0)
+		else
+			for _, part in pairs(folder:GetChildren()) do
+				if (part.Position - newPos).Magnitude <= 0.25 then
+					-- This already created part has the position we want!
+					newTable[index] = part
+				end
+			end
+
+			if not newTable[index] then
+				-- Create a new part
+				newTable[index] = createPart(newPos)
+			end
+		end
 	end
+
+	-- Remove unused parts
+	-- for _, v in pairs(folder:GetChildren()) do
+	-- 	local found = table.find(newTable, v)
+	-- 	if not found then
+	-- 		v:Destroy()
+	-- 	end
+	-- end
+
+	-- Update partsTable
+	for i, v in pairs(newTable) do
+		partTable[i] = v
+	end
+
 	updateInProgress = false
 end
 
@@ -99,22 +128,34 @@ function module.SteppedFunction(dt)
 				partTable[5].Position.Z
 			)).Magnitude
 
+			-- Get closest part to player
+			local closestPart
+			local closestDistance = math.huge
+			for i, part in pairs(partTable) do
+				if i ~= 5 then -- Don't use middle part
+					local newDistance = (Vector2.new(part.Position.X, part.Position.Z) - Vector2.new(
+						rootPart.Position.X,
+						rootPart.Position.Z
+					)).Magnitude
+					if newDistance < closestDistance then -- If part is closer (by a margin)
+						closestPart = part
+						closestDistance = newDistance
+					end
+				end
+			end
+
 			if distance > CHANGE_RADIUS then
 				-- Player has walked further than max distance --> update parts
-				updatePartTable(rootPart.Position)
+				updatePartTable(closestPart)
 				return true
 			end
 		end
 	end
 end
 
--- Disconnect update function and destroy parts
+-- Destroy parts
 function module.Destroy()
-	if connection then
-		connection:Disconnect()
-		connection = nil
-	end
-	for _, v in pairs(partTable) do
+	for _, v in pairs(folder:GetChildren()) do
 		if v then
 			v:Destroy()
 		end
