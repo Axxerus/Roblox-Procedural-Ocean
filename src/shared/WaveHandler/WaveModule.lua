@@ -37,7 +37,6 @@ local requestSettings, settingsChanged = createRemotes()
 local parent = script.Parent
 local Interpolation = require(parent:WaitForChild("InterpolateVector3")).new()
 local SyncedClock = require(parent:WaitForChild("ClockSync"))
-local InfiniteTiling = require(parent:WaitForChild("InfiniteTilingHandler"))
 
 SyncedClock:Initialize()
 
@@ -112,9 +111,6 @@ function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 		if settings.ListenToServer then
 			-- Listen to SERVER for getting settings
 			-- Don't create settings locally
-
-			-- Setup tiles around ocean
-			InfiniteTiling.Setup(instance)
 
 			-- Request settings from server (RemoteFunction)
 			local generalSettings, waveSettings = requestSettings:InvokeServer()
@@ -535,9 +531,6 @@ function Wave:Destroy()
 			warn("Retrying to destory wave, count:", count, "\nError:", response)
 		end
 	end
-
-	-- Remove infinite tiling
-	InfiniteTiling.Destroy()
 
 	-- Cleanup variables
 	self._bones = {}
