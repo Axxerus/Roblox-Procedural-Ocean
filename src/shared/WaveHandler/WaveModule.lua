@@ -446,25 +446,6 @@ function Wave:ConnectUpdate(frameDivisionCount)
 		local batchCounter = 1
 		local boneCounter = 0
 
-		-- local function updateBatches(source)
-		-- 	updateBonesAmount = math.round(#source / frameDivisionCount)
-		-- 	batchCounter = 1
-		-- 	boneCounter = 0
-		-- 	for _, bone in pairs(source) do
-		-- 		if not batches[batchCounter] then
-		-- 			batches[batchCounter] = {}
-		-- 		end
-		-- 		table.insert(batches[batchCounter], bone)
-		-- 		boneCounter += 1
-		-- 		if boneCounter >= updateBonesAmount then
-		-- 			-- Setup new batch
-		-- 			boneCounter = 0
-		-- 			batchCounter += 1
-		-- 		end
-		-- 	end
-		-- end
-		-- updateBatches(self._bones)
-
 		for _, bone in pairs(self._bones) do
 			if not batches[batchCounter] then
 				batches[batchCounter] = {}
@@ -482,44 +463,9 @@ function Wave:ConnectUpdate(frameDivisionCount)
 		local connection = RunService.Stepped:Connect(function(_, dt)
 			debug.profilebegin("Update bones of wave")
 
-			-- Update tiles (create new if necessary)
-			-- InfiniteTiling.SteppedFunction(dt)
-
-			-- Move plane
-			-- local char = game:GetService("Players").LocalPlayer.Character
-			-- if char then
-			-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
-			-- 	if rootPart then
-			-- 		self._instance.Position = Vector3.new(
-			-- 			rootPart.Position.X,
-			-- 			self._instance.Position.Y,
-			-- 			rootPart.Position.Z
-			-- 		)
-			-- 	end
-			-- end
-
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
 				currentBatch = 1
-
-				-- Update batches
-				-- local char = game:GetService("Players").LocalPlayer.Character
-				-- if char then
-				-- 	local rootPart = char:FindFirstChild("HumanoidRootPart")
-				-- 	if rootPart then
-				-- 		-- Update batches
-				-- 		local newBones = {}
-				-- 		for _, v in pairs(workspace.SeaParts:GetDescendants()) do
-				-- 			if
-				-- 				v:IsA("Bone")
-				-- 				and (v.Position - rootPart.Position).Magnitude <= self.generalSettings.MaxDistance
-				-- 			then
-				-- 				table.insert(newBones, v)
-				-- 			end
-				-- 		end
-				-- 		updateBatches(newBones)
-				-- 	end
-				-- end
 			end
 
 			-- Update this batch
@@ -538,22 +484,21 @@ function Wave:ConnectUpdate(frameDivisionCount)
 							destTransform = self:GerstnerWave(Vector2.new(refPos.X, refPos.Z), timeOffset)
 
 							-- Make destTransform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
-							local v2Pos = Vector2.new(refPos.X, refPos.Z)
-							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
-							local difference = math.clamp(
-								1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2),
-								0,
-								1
-							)
-							if difference < 0.15 then
-								destTransform *= difference
-							end
+							-- local v2Pos = Vector2.new(refPos.X, refPos.Z)
+							-- local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
+							-- local difference = math.clamp(
+							-- 	1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2),
+							-- 	0,
+							-- 	1
+							-- )
+							-- if difference < 0.15 then
+							-- 	destTransform *= difference
+							-- end
 						end
 					end
 				end
 
 				if destTransform then
-					--bone.Transform = CFrame.new(destTransform)
 					Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
 				end
 			end
