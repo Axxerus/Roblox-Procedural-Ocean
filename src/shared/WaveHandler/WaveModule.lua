@@ -2,28 +2,28 @@
 	Main module that handles waves.
 ]]
 
-local RunService = game:GetService("RunService")
+local requestName = "RequestSettings"
+local changedName = "SettingsChanged"
 
-local REQUEST_NAME = "RequestSettings"
-local CHANGED_NAME = "SettingsChanged"
+local RunService = game:GetService("RunService")
 
 -- Create remotes on server or wait for creation on client
 local function createRemotes()
-	local request, changed = script.Parent:FindFirstChild(REQUEST_NAME), script.Parent:FindFirstChild(CHANGED_NAME)
+	local request, changed = script.Parent:FindFirstChild(requestName), script.Parent:FindFirstChild(changedName)
 	if not request or not changed then
 		if RunService:IsClient() then
 			-- Wait for server to create remotes
 			warn("Remotes have not been setup on the server yet. Waiting for creation.")
-			request = script.Parent:WaitForChild(REQUEST_NAME)
-			changed = script.Parent:WaitForChild(CHANGED_NAME)
+			request = script.Parent:WaitForChild(requestName)
+			changed = script.Parent:WaitForChild(changedName)
 		else
 			-- Only create Remotes on the server
 			request = Instance.new("RemoteFunction")
-			request.Name = REQUEST_NAME
+			request.Name = requestName
 			request.Parent = script.Parent
 
 			changed = Instance.new("RemoteEvent")
-			changed.Name = CHANGED_NAME
+			changed.Name = changedName
 			changed.Parent = script.Parent
 		end
 	end
@@ -34,9 +34,8 @@ end
 local requestSettings, settingsChanged = createRemotes()
 
 -- Modules
-local parent = script.Parent
-local Interpolation = require(parent:WaitForChild("InterpolateVector3")).new()
-local SyncedClock = require(parent:WaitForChild("ClockSync"))
+local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
+local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
 
 SyncedClock:Initialize()
 
@@ -53,43 +52,45 @@ local default = {
 local Wave = {}
 Wave.__index = Wave
 
--- Utility for sorting settings into two tables:
--- One for general settings (apply to all waves)
--- One for wave settings (specific settings per wave)
-local function sortSettings(settings)
-	local waveSettings = {}
-	local generalSettings = {}
-	local waveCounter = 0
-	for i, v in pairs(settings) do
-		if typeof(v) == "table" then
-			-- Insert in wave settings table
-			waveSettings[i] = v
-			waveCounter += 1
-		else
-			-- Insert in general settings table
-			generalSettings[i] = v
-		end
-	end
-	return generalSettings, waveSettings, waveCounter
-end
-
 -- Create a new Wave object
-function Wave.new(instance, settings)
+function Wave.new(instance: Instance, settings: table | nil, bones: table | nil)
 	-- Check types
 	if typeof(instance) ~= "Instance" then
 		error("Instance argument must be a valid instance!")
 	end
 
-	-- Get bones inside Model
-	local bones = {}
-	for _, v in pairs(instance:GetDescendants()) do
-		if v:IsA("Bone") then
-			table.insert(bones, v)
+	if bones == nil then
+		-- Get bones inside Model
+		bones = {}
+		for _, v in pairs(instance:GetDescendants()) do
+			if v:IsA("Bone") then
+				table.insert(bones, v)
+			end
 		end
 	end
 
-	if #bones <= 0 then
+	if not bones or #bones <= 0 then
 		error("No bones have been found inside the chosen model!")
+	end
+
+	-- Sort settings into two tables:
+	-- * one for general settings (apply to all waves)
+	-- * one for wave settings (specific settings per wave)
+	local function sortSettings()
+		local waveSettings = {}
+		local generalSettings = {}
+		local waveCounter = 0
+		for i, v in pairs(settings) do
+			if typeof(v) == "table" then
+				-- Insert in wave settings table
+				waveSettings[i] = v
+				waveCounter += 1
+			else
+				-- Insert in general settings table
+				generalSettings[i] = v
+			end
+		end
+		return generalSettings, waveSettings, waveCounter
 	end
 
 	-- Return metatable / "Wave" object
@@ -118,13 +119,11 @@ function Wave.new(instance, settings)
 			end
 
 			-- Listen to server settings change (RemoteEvent)
-			settingsChanged.OnClientEvent:Connect(function(newGeneralSettings, newWaveSettings, interpolationTime)
+			settingsChanged.OnClientEvent:Connect(function(newGeneralSettings, newWaveSettings)
 				if meta then
 					meta.generalSettings = newGeneralSettings
 					meta.waveSettings = newWaveSettings
 				end
-				-- Update cached variables
-				meta:UpdateCachedVars(newGeneralSettings, newWaveSettings, interpolationTime)
 			end)
 			return meta
 		else
@@ -132,7 +131,7 @@ function Wave.new(instance, settings)
 			-- Effect will be LOCAL only!
 
 			-- Sort settings
-			local generalSettings, waveSettings, waveCounter = sortSettings(settings)
+			local generalSettings, waveSettings, waveCounter = sortSettings()
 
 			if waveCounter >= 1 then
 				-- Return "Wave" object
@@ -143,7 +142,7 @@ function Wave.new(instance, settings)
 		end
 	else
 		-- Setup for server
-		local generalSettings, waveSettings, waveCounter = sortSettings(settings)
+		local generalSettings, waveSettings, waveCounter = sortSettings()
 		if waveCounter >= 1 then
 			local meta = createMeta(generalSettings, waveSettings)
 
@@ -159,23 +158,6 @@ function Wave.new(instance, settings)
 	end
 end
 
--- Update settings of wave
-function Wave:UpdateWaveSettings(newSettings, interpolationTime)
-	interpolationTime = nil --interpolationTime or 2
-	-- Sort settings
-	local generalSettings, waveSettings, waveCounter = sortSettings(newSettings)
-	if waveCounter <= 0 then
-		warn("Updated wave settings don't contain a valid wave!")
-	end
-	-- Update settings and cachedVars (locally)
-	self:UpdateCachedVars(generalSettings, waveSettings, interpolationTime)
-
-	-- Send to clients
-	if RunService:IsServer() then
-		settingsChanged:FireAllClients(generalSettings, waveSettings, interpolationTime)
-	end
-end
-
 -- Calculate final displacement sum of all Gerstner waves
 function Wave:GerstnerWave(xzPos, timeOffset)
 	local finalDisplacement = Vector3.new()
@@ -183,12 +165,12 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 	for waveName, _ in pairs(self.waveSettings) do
 		-- Calculate cachedVars (if they weren't already calculated)
 		if not self._cachedVars[waveName] then
-			self:UpdateCachedVars(self.generalSettings, self.waveSettings)
+			self:UpdateCachedVars()
 		end
 
 		-- Get cached variables (they don't need to be recalculated every frame)
 		local cached = self._cachedVars[waveName]
-		local period = cached["Period"]
+		local k = cached["K"]
 		local speed = cached["WaveSpeed"]
 		local dir = cached["UnitDirection"]
 		local amplitude = cached["Amplitude"]
@@ -196,9 +178,9 @@ function Wave:GerstnerWave(xzPos, timeOffset)
 		-- Calculate displacement whilst taking into account the time offset
 		local displacement
 		if not timeOffset then
-			displacement = (period * dir:Dot(xzPos)) + (speed * SyncedClock:GetTime())
+			displacement = (k * dir:Dot(xzPos)) + (speed * SyncedClock:GetTime())
 		else
-			displacement = (period * dir:Dot(xzPos)) + (speed * (SyncedClock:GetTime() + timeOffset))
+			displacement = (k * dir:Dot(xzPos)) + (speed * (SyncedClock:GetTime() + timeOffset))
 		end
 
 		-- Calculate displacement on every axis (xyz)
@@ -223,88 +205,35 @@ function Wave:GetHeight(xzPos, timeOffset)
 end
 
 -- Update cached variables used by GerstnerWave function
-function Wave:UpdateCachedVars(newGeneralSettings, newWaveSettings, smoothInterpolationTime)
-	-- Shorthand functions
-	local function getSetting(newSetting, name)
-		return newSetting[name] or newGeneralSettings[name] or default[name]
-	end
-	local function calculateNewvars(waveLength, gravity, direction, steepness)
-		local period = (2 * math.pi) / waveLength
-		local speed = math.sqrt(gravity * period)
+function Wave:UpdateCachedVars()
+	self._cachedVars = {}
+	for waveName, waveSetting in pairs(self.waveSettings) do
+		-- Get settings: from this wave, from generalSettings or from default
+		local waveLength = waveSetting.WaveLength or self.generalSettings.WaveLength or default.WaveLength
+		local gravity = waveSetting.Gravity or self.generalSettings.Gravity or default.Gravity
+		local direction = waveSetting.Direction or self.generalSettings.Direction or default.Direction
+		local steepness = waveSetting.Steepness or self.generalSettings.Steepness or default.Steepness
+
+		-- Variables that don't change on tick
+		local k = (2 * math.pi) / waveLength
+		local speed = math.sqrt(gravity * (2 * math.pi / waveLength))
 		local dir = direction.Unit
-		local amplitude = steepness / period
-		return period, speed, dir, amplitude
+		local amplitude = steepness / k
+
+		self._cachedVars[waveName] = {
+			K = k,
+			WaveSpeed = speed,
+			UnitDirection = dir,
+			Amplitude = amplitude,
+		}
 	end
-
-	if not smoothInterpolationTime or typeof(smoothInterpolationTime) ~= "number" then
-		-- Instantly set variables
-		self._cachedVars = {}
-		for waveName, waveSetting in pairs(newWaveSettings) do
-			-- Get settings: from this wave, from generalSettings or from default
-			local waveLength = getSetting(waveSetting, "WaveLength")
-			local gravity = getSetting(waveSetting, "Gravity")
-			local direction = getSetting(waveSetting, "Direction")
-			local steepness = getSetting(waveSetting, "Steepness")
-
-			local period, speed, dir, amplitude = calculateNewvars(waveLength, gravity, direction, steepness)
-
-			-- Instantly set cached variables
-			self._cachedVars[waveName] = {
-				Period = period,
-				WaveSpeed = speed,
-				UnitDirection = dir,
-				Amplitude = amplitude,
-			}
-		end
-	else
-		-- TODO: make smooth transition possible
-		-- Smoothly tween into new values
-		-- used for tweening from previous value or from 0
-		local function getCached(name)
-			return self._cachedVars[name] or 0
-		end
-		-- Tween to new values
-		for waveName, waveSetting in pairs(newWaveSettings) do
-			-- Get settings: from this wave, from generalSettings or from default
-			local waveLength = getSetting(waveSetting, "WaveLength")
-			local gravity = getSetting(waveSetting, "Gravity")
-			local direction = getSetting(waveSetting, "Direction")
-			local steepness = getSetting(waveSetting, "Steepness")
-
-			local period, speed, dir, amplitude = calculateNewvars(waveLength, gravity, direction, steepness)
-
-			-- Calculate increments
-			local frames = smoothInterpolationTime * 60
-			local periodIncrement = (period - getCached("Period")) / frames
-			local speedIncrement = (speed - getCached("WaveSpeed")) / frames
-			--local dirIncrement = (dir - getCached("UnitDirection")) / frames
-			local amplitudeIncrement = (amplitude - getCached("Amplitude")) / frames
-
-			-- Smoothly interpolate values (on a separate thread)
-			coroutine.wrap(function()
-				for _ = 1, frames, 1 do
-					local cached = self._cachedVars[waveName]
-					self._cachedVars[waveName] = {
-						Period = cached["Period"] + periodIncrement,
-						WaveSpeed = cached["WaveSpeed"] + speedIncrement,
-						UnitDirection = cached["UnitDirection"], --+ dirIncrement,
-						Amplitude = cached["Amplitude"] + amplitudeIncrement,
-					}
-					RunService.Heartbeat:Wait()
-				end
-			end)()
-		end
-	end
-	-- Set new settings
-	self.generalSettings = newGeneralSettings
-	self.waveSettings = newWaveSettings
 end
 
 -- Make a part float on the waves
-function Wave:AddFloatingPart(part)
+function Wave:AddFloatingPart(part, posDrag)
 	local numberOfAttachments = 4
-	local positionDrag = 0.4
-	local rotationalDrag = 0.1
+	local positionDrag = posDrag or 0.3
+	local rotationalDrag = 0.5
 
 	if typeof(part) ~= "Instance" then
 		error("Part must be a valid Instance.")
@@ -324,7 +253,7 @@ function Wave:AddFloatingPart(part)
 		Vector3.new(-x, -y, z),
 		Vector3.new(-x, -y, -z),
 	}
-	local attachmentForces = {}
+	local attachments = {}
 	-- Create attachments and their forces
 	for index, relativePos in pairs(corners) do
 		local attach = Instance.new("Attachment")
@@ -341,7 +270,7 @@ function Wave:AddFloatingPart(part)
 		force.Enabled = true
 		force.ApplyAtCenterOfMass = false
 		force.Parent = part
-		attachmentForces[attach] = force
+		attachments[attach] = force
 	end
 
 	-- Create angular drag
@@ -371,15 +300,12 @@ function Wave:AddFloatingPart(part)
 		local displacementAmount = 1
 
 		-- Force per attachment
-		for attachment, force in pairs(attachmentForces) do
+		for attachment, force in pairs(attachments) do
 			local worldPos = attachment.WorldPosition
 			-- Calculate wave height at the attachment's position
 			local waveHeight = self._instance.Position.Y + self:GetHeight(Vector2.new(worldPos.X, worldPos.Z))
-			local displacementMultiplier = math.clamp(
-				(waveHeight - worldPos.Y) / depthBeforeSubmerged * displacementAmount,
-				0,
-				1
-			)
+			local displacementMultiplier =
+				math.clamp((waveHeight - worldPos.Y) / depthBeforeSubmerged * displacementAmount, 0, 1)
 
 			-- Set force of attachment
 			local destForce
@@ -417,18 +343,18 @@ function Wave:AddFloatingPart(part)
 			difference = 1
 		else
 			-- (middle of) part is out of water! remove rotational drag the further it goes from the water
-			difference = (difference ^ 2) / 8
+			difference = (difference ^ 2) / 4
 		end
-		local destTorque = (
+		waterDragTorque.MaxTorque = (
 				Vector3.new(math.abs(p.X), math.abs(p.Y), math.abs(p.Z))
 				* largestSize
 				* part.AssemblyMass
 				* workspace.Gravity
 				/ difference
-			) * rotationalDrag
-		waterDragTorque.MaxTorque = destTorque
+			)
+			* rotationalDrag
 
-		-- Parts might have been added/removed to the assembly, so update the cancelGravity force
+		-- Parts might have been added to the assembly, so update the cancelGravity force
 		cancelGravity.Force = Vector3.new(0, workspace.Gravity * part.AssemblyMass, 0)
 	end)
 end
@@ -438,7 +364,7 @@ function Wave:AddPlayerFloat(player)
 	local rootPart = char:WaitForChild("HumanoidRootPart")
 	--local humanoid = char:WaitForChild("Humanoid")
 
-	self:AddFloatingPart(rootPart)
+	self:AddFloatingPart(rootPart, 3)
 
 	-- Setup BodyForces
 	-- local dirVelocity
@@ -503,14 +429,14 @@ end
 -- Update wave's bones on Stepped (only done client-side)
 function Wave:ConnectUpdate(frameDivisionCount)
 	if RunService:IsClient() then
-		frameDivisionCount = frameDivisionCount or 25
+		frameDivisionCount = frameDivisionCount or 20
 
 		-- Generate tables containing small(er) batches of bones
 		local updateBonesAmount = math.round(#self._bones / frameDivisionCount)
 		local batches = {}
+
 		local batchCounter = 1
 		local boneCounter = 0
-
 		for _, bone in pairs(self._bones) do
 			if not batches[batchCounter] then
 				batches[batchCounter] = {}
@@ -526,32 +452,45 @@ function Wave:ConnectUpdate(frameDivisionCount)
 
 		local currentBatch = 1
 		local connection = RunService.Stepped:Connect(function(_, dt)
+			debug.profilebegin("Update bones of wave")
 			if currentBatch > #batches then
 				-- Reset currentBatch to 1
 				currentBatch = 1
 			end
 
-			-- Update this batch
-			for _, bone in pairs(batches[currentBatch]) do
-				local refPos = bone.WorldPosition
-
-				local destTransform = Vector3.new()
-				local camera = workspace.CurrentCamera
-				if camera then
-					local camPos = camera.CFrame.Position
-					if camPos then
-						if (camPos - refPos).Magnitude <= self.generalSettings.MaxDistance then
+			local camera = workspace.CurrentCamera
+			if camera then
+				local camPos = camera.CFrame.Position
+				if camPos then
+					for _, bone in pairs(batches[currentBatch]) do
+						local worldPos = bone.WorldPosition
+						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
 							-- Bone is close enough to camera; calculate offset
 							local timeOffset = dt * frameDivisionCount
-							destTransform = self:GerstnerWave(Vector2.new(refPos.X, refPos.Z), timeOffset)
+							local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
+
+							-- Make transform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
+							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
+							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
+							local difference =
+								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
+							if difference < 0.15 then
+								transform *= difference
+							end
+
+							-- Smoothly interpolate bone to position
+							Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
+						else
+							-- Clear transformation
+							if bone.Transform ~= CFrame.new() then
+								bone.Transform = CFrame.new()
+							end
 						end
 					end
 				end
-				if destTransform then
-					Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
-				end
+				currentBatch += 1
 			end
-			currentBatch += 1
+			debug.profileend()
 		end)
 
 		table.insert(self._connections, connection)
@@ -579,10 +518,9 @@ function Wave:Destroy()
 					v:Disconnect()
 				end)
 			until success or count >= 10
-			warn("Retrying to destroy wave, count:", count, "\nError:", response)
+			warn("Retrying to destory wave, count:", count, "\nError:", response)
 		end
 	end
-
 	-- Cleanup variables
 	self._bones = {}
 	self.generalSettings = {}
