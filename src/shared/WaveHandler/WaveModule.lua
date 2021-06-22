@@ -34,7 +34,7 @@ end
 local requestSettings, settingsChanged = createRemotes()
 
 -- Modules
-local Interpolation = require(script.Parent:WaitForChild("InterpolateTransform")).new()
+local Interpolation = require(script.Parent:WaitForChild("InterpolateVector3")).new()
 local SyncedClock = require(script.Parent:WaitForChild("ClockSync"))
 
 SyncedClock:Initialize()
@@ -467,19 +467,10 @@ function Wave:ConnectUpdate(frameDivisionCount)
 						if (camPos - worldPos).Magnitude <= self.generalSettings.MaxDistance then
 							-- Bone is close enough to camera; calculate offset
 							local timeOffset = dt * frameDivisionCount
-							local transform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
-
-							-- Make transform 0 near edges (inscribed circle) of plane (for smoothly fading into flat planes)
-							local v2Pos = Vector2.new(worldPos.X, worldPos.Z)
-							local instPos = Vector2.new(self._instance.Position.X, self._instance.Position.Z)
-							local difference =
-								math.clamp(1 - (v2Pos - instPos).Magnitude / (self._instance.Size.X / 2), 0, 1)
-							if difference < 0.15 then
-								transform *= difference
-							end
+							local destTransform = self:GerstnerWave(Vector2.new(worldPos.X, worldPos.Z), timeOffset)
 
 							-- Smoothly interpolate bone to position
-							Interpolation:AddInterpolation(bone, transform, frameDivisionCount)
+							Interpolation:AddInterpolation(bone, "Transform", destTransform, frameDivisionCount)
 						else
 							-- Clear transformation
 							if bone.Transform ~= CFrame.new() then
